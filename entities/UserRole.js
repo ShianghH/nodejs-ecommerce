@@ -11,11 +11,6 @@ module.exports = new EntitySchema({
       nullable: false,
       comment: "使用者角色唯一 ID",
     },
-    user_id: {
-      type: "uuid",
-      nullable: false,
-      comment: "對應使用者 ID",
-    },
     rolename: {
       type: "varchar",
       length: 50,
@@ -30,10 +25,10 @@ module.exports = new EntitySchema({
       joinColumn: {
         name: "user_id",
         referencedColumnName: "id",
-        foreignKeyConstraintName: "fk_user_role_user"
+        foreignKeyConstraintName: "fk_user_role_user",
       },
       cascade: false,
-      onDelete: "CASCADE"
+      onDelete: "CASCADE",
     },
   },
 });

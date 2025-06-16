@@ -1,56 +1,50 @@
 const { EntitySchema } = require("typeorm");
 
 module.exports = new EntitySchema({
-  name: "CartItem",
-  tableName: "cart_items",
+  name: "ProductTag",
+  tableName: "product_tags",
   columns: {
     id: {
       primary: true,
       type: "uuid",
       generated: "uuid",
       nullable: false,
-      comment: "購物車項目唯一 ID",
+      comment: "關聯唯一 ID",
     },
-    quantity: {
+    sort_order: {
       type: "integer",
       nullable: false,
-      comment: "購買數量",
+      comment: "顯示排序",
     },
     created_at: {
       type: "timestamp",
       createDate: true,
       nullable: false,
-      comment: "加入購物車的時間",
-    },
-    updated_at: {
-      type: "timestamp",
-      updateDate: true,
-      nullable: false,
-      comment: "最後修改時間",
+      comment: "建立時間",
     },
   },
   relations: {
-    user: {
-      target: "User",
+    product: {
+      target: "Product",
       type: "many-to-one",
       joinColumn: {
-        name: "user_id",
+        name: "product_id",
         referencedColumnName: "id",
-        foreignKeyConstraintName: "fk_cart_items_user",
+        foreignKeyConstraintName: "fk_product_tags_product",
       },
-      cascade: false,
       onDelete: "CASCADE",
+      nullable: false,
     },
-    productVariant: {
-      target: "ProductVariant",
+    tag: {
+      target: "Tag",
       type: "many-to-one",
       joinColumn: {
-        name: "product_variants_id",
+        name: "tag_id",
         referencedColumnName: "id",
-        foreignKeyConstraintName: "fk_cart_items_product_variant",
+        foreignKeyConstraintName: "fk_product_tags_tag",
       },
-      cascade: false,
       onDelete: "CASCADE",
+      nullable: false,
     },
   },
 });

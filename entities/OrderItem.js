@@ -1,56 +1,59 @@
 const { EntitySchema } = require("typeorm");
 
 module.exports = new EntitySchema({
-  name: "CartItem",
-  tableName: "cart_items",
+  name: "OrderItem",
+  tableName: "order_items",
   columns: {
     id: {
       primary: true,
       type: "uuid",
       generated: "uuid",
       nullable: false,
-      comment: "購物車項目唯一 ID",
+      comment: "訂單項目唯一ID",
     },
     quantity: {
       type: "integer",
       nullable: false,
       comment: "購買數量",
     },
-    created_at: {
-      type: "timestamp",
-      createDate: true,
+    original_price: {
+      type: "decimal",
       nullable: false,
-      comment: "加入購物車的時間",
+      comment: "原價",
     },
-    updated_at: {
-      type: "timestamp",
-      updateDate: true,
+    unit_price: {
+      type: "decimal",
       nullable: false,
-      comment: "最後修改時間",
+      comment: "折扣後價格",
+    },
+    subtotal: {
+      type: "decimal",
+      nullable: false,
+      comment: "單品總價",
     },
   },
   relations: {
-    user: {
-      target: "User",
+    order: {
+      target: "Order",
       type: "many-to-one",
       joinColumn: {
-        name: "user_id",
+        name: "order_id",
         referencedColumnName: "id",
-        foreignKeyConstraintName: "fk_cart_items_user",
+        foreignKeyConstraintName: "fk_order_items_order",
       },
-      cascade: false,
+      nullable: false,
       onDelete: "CASCADE",
     },
-    productVariant: {
+    product_variant: {
       target: "ProductVariant",
       type: "many-to-one",
       joinColumn: {
         name: "product_variants_id",
         referencedColumnName: "id",
-        foreignKeyConstraintName: "fk_cart_items_product_variant",
+        foreignKeyConstraintName: "fk_order_items_product_variant",
       },
-      cascade: false,
-      onDelete: "CASCADE",
+      nullable: false,
+      onDelete: "RESTRICT",
     },
   },
 });
