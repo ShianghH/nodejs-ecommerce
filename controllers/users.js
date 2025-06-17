@@ -1,4 +1,4 @@
-const { dataSource } = require("../db/data-source"); // 用來對資料庫做查詢、存取等操作
+const { dataSource } = require("../db/data-source");
 const logger = require("../utils/logger")("UsersController"); // 建立 logger 實例，標記這份 log 是來自 Users
 const config = require("../config/index"); // 引入自訂的設定管理器，集中管理 db/web/secret 等設定
 const bcrypt = require("bcrypt"); // 引入 bcrypt 套件，用來加密密碼（雜湊處理）
@@ -41,18 +41,17 @@ const postSignup = async (req, res, next) => {
     }
     if (!passwordPattern.test(password)) {
       logger.warn(
-        "建立使用者錯誤: 密碼不符合規則，需要包含英文數字大小寫，最短8個字，最長32個字"
+        "建立使用者錯誤: 密碼不符合規則，需要包含英文數字大小寫，長度 8～32 字元"
       );
       res.status(400).json({
         status: "failed",
-        message:
-          "密碼不符合規則，需要包含英文數字大小寫，最短8個字，最長32個字",
+        message: "密碼不符合規則，需要包含英文數字大小寫，長度 8～32 字元",
       });
       return;
     }
 
     //取得對應 'users' entity 的資料存取物件（Repository）
-    const userRepository = dataSource.getRepository("users");
+    const userRepository = dataSource.getRepository("User");
 
     //查詢資料庫中是否已存在相同 email 的使用者（用於註冊驗證）
     const existingUser = await userRepository.findOne({
@@ -104,6 +103,8 @@ const postSignup = async (req, res, next) => {
 const postSignin = async (req, res, next) => {
   try {
     const { email, password } = req.body;
+
+    //  1. 檢查 Email 與密碼是否填寫正確
     if (
       isUndefined(email) ||
       isNotValidString(email) ||
@@ -111,32 +112,31 @@ const postSignin = async (req, res, next) => {
       isUndefined(password) ||
       isNotValidString(password)
     ) {
-      logger.warn("欄位未填寫正確");
+      logger.warn("[Signin] 欄位驗證失敗：Email 或密碼未填寫或格式錯誤");
       res.status(400).json({
         status: "failed",
-        message: "欄位未填寫正確",
+        message: "請確認 Email 與密碼是否正確填寫",
       });
       return;
     }
+    //  2. 檢查密碼是否符合規則
     if (!passwordPattern.test(password)) {
-      logger.warn(
-        "密碼不符合規則，需要包含英文數字大小寫，最短8個字，最長32個字"
-      );
+      logger.warn("[Signin] 密碼格式錯誤：不符合強度規則");
       res.status(400).json({
         status: "failed",
-        message:
-          "密碼不符合規則，需要包含英文數字大小寫，最短8個字，最長32個字",
+        message: "密碼需包含英文大小寫與數字，長度 8～32 字元",
       });
       return;
     }
-    // 取得 users 資料表的 Repository，用來查詢或操作使用者資料
-    const userRepository = dataSource.getRepository("users");
+    // 3. 查詢使用者是否存在,取得 users 資料表的 Repository，用來查詢或操作使用者資料
+    const userRepository = dataSource.getRepository("User");
     // 查詢是否已有該 email 的使用者（只取 id、name、password 三個欄位）
     const existingUser = await userRepository.findOne({
       where: { email },
       select: ["id", "name", "password", "email"],
     });
     if (!existingUser) {
+      logger.warn(`[Signin] 查無此帳號：${email}`);
       res.status(401).json({
         status: "failed",
         message: "使用者不存在或密碼輸入錯誤",
@@ -148,6 +148,7 @@ const postSignin = async (req, res, next) => {
     // 比對使用者輸入的明文密碼與資料庫中加密後的密碼是否一致`
     const isMach = await bcrypt.compare(password, existingUser.password);
     if (!isMach) {
+      logger.warn(`[Signin] 密碼比對失敗：${email}`);
       res.status(401).json({
         status: "failed",
         message: "使用者不存在或密碼輸入錯誤",
@@ -178,7 +179,7 @@ const postSignin = async (req, res, next) => {
       },
     });
   } catch (error) {
-    logger.error("登入錯誤:", error);
+    logger.error("[Signin] 登入錯誤：", error);
     next(error);
   }
 };

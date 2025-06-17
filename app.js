@@ -5,6 +5,10 @@ const pinoHttp = require("pino-http");
 
 console.log("[Render][app] 基本套件載入完成");
 
+const logger = require("./utils/logger")("App");
+
+const usersRouter = require("./routes/users");
+
 console.log("[Render][app] 所有 routes 載入完成");
 
 const app = express();
@@ -33,6 +37,8 @@ app.get("/healthcheck", (req, res) => {
   res.status(200);
   res.send("OK");
 });
+
+app.use("/api/v1/users", usersRouter);
 
 console.log("[Render][app] 所有 API route 註冊完成");
 
