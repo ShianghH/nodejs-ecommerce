@@ -16,6 +16,8 @@ const {
 
 //從 firebase-admin 引入 FCM 通知模組，用於發送推播訊息給裝置（Web/App）
 const { messaging } = require("firebase-admin");
+const { password } = require("../config/db");
+const { startTime } = require("pino-http");
 
 const postSignup = async (req, res, next) => {
   try {
@@ -184,7 +186,36 @@ const postSignin = async (req, res, next) => {
   }
 };
 
+const patchPassword = async (req, res, next) => {
+  try {
+    const { id } = req.user;
+    const { password, newPassword, confirmNewPassword } = req.body;
+
+    logger.info(`[PATCH /users/password] 使用者 ${id} 嘗試修改密碼`);
+
+    if (
+      isUndefined(password) ||
+      isNotValidString(password) ||
+      isUndefined(newPassword) ||
+      isNotValidString(newPassword) ||
+      isUndefined(confirmNewPassword) ||
+      isNotValidString(confirmNewPassword)
+    ) {
+      logger.warn(`[PATCH /users/password] 欄位未填寫正確 - user: ${id}`);
+      res.status(400).json({
+        status: "failed",
+        message: "欄位未填寫正確",
+      });
+      return;
+    }
+  } catch (error) {
+    logger.error(`[PATCH /users/password] 發生錯誤：${error.message}`);
+    next(error);
+  }
+};
+
 module.exports = {
   postSignup,
   postSignin,
+  patchPassword,
 };

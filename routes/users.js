@@ -20,9 +20,14 @@ const auth = require("../middlewares/auth")({
   logger,
 });
 
-const { postSignup, postSignin } = require("../controllers/users");
+const {
+  postSignup,
+  postSignin,
+  patchPassword,
+} = require("../controllers/users");
 
 router.post("/sign-up", postSignup);
 router.post("/sign-in", postSignin);
+router.patch("/password", auth, patchPassword);
 
 module.exports = router;
