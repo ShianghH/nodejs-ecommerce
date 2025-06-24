@@ -1,6 +1,7 @@
 const { dataSource } = require("../db/data-source");
 const logger = require("../utils/logger")("UsersController"); // 建立 logger 實例，標記這份 log 是來自 Users
 const config = require("../config/index"); // 引入自訂的設定管理器，集中管理 db/web/secret 等設定
+
 const bcrypt = require("bcrypt"); // 引入 bcrypt 套件，用來加密密碼（雜湊處理）
 const generateJWT = require("../utils/generateJWT"); // 引入自訂的 JWT 產生器，用來簽發登入後的 JSON Web Token
 const passwordPattern = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,32}/; // 密碼格式規則：需包含至少一個數字、一個大寫、一個小寫，長度 8-32 字元
@@ -192,7 +193,7 @@ const patchPassword = async (req, res, next) => {
     const { password, newPassword, confirmNewPassword } = req.body;
 
     logger.info(`[PATCH /users/password] 使用者 ${id} 嘗試修改密碼`);
-
+    //欄位驗證
     if (
       isUndefined(password) ||
       isNotValidString(password) ||
@@ -208,6 +209,71 @@ const patchPassword = async (req, res, next) => {
       });
       return;
     }
+    if (
+      !passwordPattern.test(password) ||
+      !passwordPattern.test(newPassword) ||
+      !passwordPattern.test(confirmNewPassword)
+    ) {
+      logger.warn(
+        "密碼不符合規則，需要包含英文數字大小寫，最短8個字，最長16個字"
+      );
+      res.status(400).json({
+        status: "failed",
+        message:
+          "密碼不符合規則，需要包含英文數字大小寫，最短8個字，最長16個字",
+      });
+      return;
+    }
+    if (newPassword === password) {
+      logger.warn("新密碼不能與舊密碼相同");
+      res.status(400).json({
+        status: "failed",
+        message: "新密碼不能與舊密碼相同",
+      });
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      logger.warn("新密碼與驗證新密碼不一致");
+      res.status(400).json({
+        status: "failed",
+        message: "新密碼與驗證新密碼不一致",
+      });
+      return;
+    }
+
+    const userRepository = dataSource.getRepository("User");
+    const existingUser = await userRepository.findOne({
+      select: ["password"],
+      where: { id },
+    });
+    const isMatch = await bcrypt.compare(password, existingUser.password);
+    if (!isMatch) {
+      logger.warn(`[PATCH /users/password] 舊密碼輸入錯誤 - user: ${id}`);
+      res.status(400).json({
+        status: "failed",
+        message: "密碼輸入錯誤",
+      });
+      return;
+    }
+    const salt = await bcrypt.genSalt(10);
+    const hashPassword = await bcrypt.hash(newPassword, salt);
+    const updatedResult = await userRepository.update(
+      { id },
+      { password: hashPassword }
+    );
+    if (updatedResult.affected === 0) {
+      logger.error(`[PATCH /users/password] 更新失敗 - user: ${id}`);
+      res.status(400).json({
+        status: "failed",
+        message: "密碼更新失敗",
+      });
+      return;
+    }
+    logger.info(`[PATCH /users/password] 密碼修改成功 - user: ${id}`);
+    res.status(200).json({
+      status: "success",
+      message: "密碼已成功修功",
+    });
   } catch (error) {
     logger.error(`[PATCH /users/password] 發生錯誤：${error.message}`);
     next(error);
