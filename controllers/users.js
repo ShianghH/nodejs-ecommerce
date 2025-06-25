@@ -9,6 +9,8 @@ const passwordPattern = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,32}/; // 密碼格式
 // Email 格式驗證規則：
 // 必須包含帳號@網域，帳號允許英數字 + 特定符號，網域支援 .com / .org 等結尾
 const emailPattern = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
+const telReg = /^09\d{8}$/;
+
 const {
   isUndefined,
   isNotValidString,
@@ -280,8 +282,66 @@ const patchPassword = async (req, res, next) => {
   }
 };
 
+const patchProfile = async (req, res, next) => {
+  try {
+    const { id } = req.user;
+    const { tel, address } = req.body;
+    logger.info(`[PATCH /users/profile] 使用者 ${id} 嘗試修改個人資料`);
+    //驗證空值
+    if (isUndefined(tel) && isUndefined(address)) {
+      logger.warn(`[PATCH /users/profile] 沒有提供任何欄位 - user: ${id}`);
+      res.status(400).json({
+        status: "failed",
+        message: "請至少提供電話或地址",
+      });
+      return;
+    }
+    //如tel有值 驗證格式
+    if (!isUndefined(tel)) {
+      if (isNotValidString(tel) || !telReg.test(tel)) {
+        logger.warn(`[PATCH /users/profile] 欄位格式錯誤 - user: ${id}`);
+        res.status(400).json({
+          status: "failed",
+          message: "欄位格式錯誤",
+        });
+        return;
+      }
+    }
+    // 地址格式驗證（僅驗證為非空字串）
+    if (!isUndefined(address)) {
+      if (isNotValidString(address)) {
+        logger.warn(`[PATCH /users/profile] 欄位格式錯誤 - user: ${id}`);
+        res.status(400).json({
+          status: "failed",
+          message: "欄位格式錯誤",
+        });
+        return;
+      }
+    }
+    const userRepository = dataSource.getRepository("User");
+    const updateData = await userRepository.update({ id }, { tel, address });
+    if (updateData.affected === 0) {
+      logger.error(`[PATCH /users/profile] 資料更新失敗 - user: ${id}`);
+      res.status(400).json({
+        status: "failed",
+        message: "資料更新失敗",
+      });
+      return;
+    }
+    logger.info(`[PATCH /users/profile] 使用者 ${id} 資料更新成功`);
+    res.status(200).json({
+      status: "success",
+      message: "資料更新成功",
+    });
+  } catch (error) {
+    logger.error(error);
+    next(error);
+  }
+};
+
 module.exports = {
   postSignup,
   postSignin,
   patchPassword,
+  patchProfile,
 };

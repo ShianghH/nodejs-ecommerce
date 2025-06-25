@@ -24,10 +24,12 @@ const {
   postSignup,
   postSignin,
   patchPassword,
+  patchProfile,
 } = require("../controllers/users");
 
 router.post("/sign-up", postSignup);
 router.post("/sign-in", postSignin);
 router.patch("/password", auth, patchPassword);
+router.patch("/profile", auth, patchProfile);
 
 module.exports = router;
