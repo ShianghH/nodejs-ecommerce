@@ -75,21 +75,28 @@ const postSignup = async (req, res, next) => {
 
     // 使用 bcrypt 將密碼加鹽後加密，產生安全的 hashed 密碼
     const hashPassword = await bcrypt.hash(password, salt);
+
+    const roleRepository = dataSource.getRepository("UserRole");
+
     // 建立新的使用者實例（尚未儲存到資料庫）
     const newUser = userRepository.create({
       name,
       email,
-      role: "USER",
       password: hashPassword,
     });
     // 將新使用者資料寫入資料庫，並取得包含 ID 的儲存結果
     const savedUser = await userRepository.save(newUser);
+    await roleRepository.insert({
+      user: savedUser,
+      rolename: "user",
+    });
+
     // 輸出日誌：記錄成功建立使用者的 ID
     logger.info("新建立的使用者ID:", savedUser.id);
     res.status(200).json({
       status: "success",
       message: "註冊成功",
-      date: {
+      data: {
         user: {
           id: savedUser.id,
           name: savedUser.name,
@@ -339,9 +346,32 @@ const patchProfile = async (req, res, next) => {
   }
 };
 
+const getProfile = async (req, res, next) => {
+  try {
+    const { id } = req.user;
+    logger.info(`[GET /users/profile] 使用者 ${id} 查詢資料`);
+    const userRepository = dataSource.getRepository("User");
+    const user = await userRepository.findOne({
+      select: ["name", "email", "tel", "address"],
+      where: { id },
+    });
+    res.status(200).json({
+      status: "success",
+      message: "查詢成功",
+      data: {
+        user,
+      },
+    });
+  } catch (error) {
+    logger.error("取得使用者資料錯誤:", error);
+    next(error);
+  }
+};
+
 module.exports = {
   postSignup,
   postSignin,
   patchPassword,
   patchProfile,
+  getProfile,
 };

@@ -8,7 +8,7 @@ const config = require("../config/index");
 const { dataSource } = require("../db/data-source");
 
 // 建立一個紀錄器，用來記錄登入過程、錯誤等等，標籤叫 "Users"
-const logger = require("../utils/logger")("Users");
+const logger = require("../utils/logger")("Admin");
 
 //初始化「身分驗證機器人」auth，傳入它需要的工具
 const auth = require("../middlewares/auth")({
@@ -19,19 +19,8 @@ const auth = require("../middlewares/auth")({
   //把登入錯誤或成功的 log 記下來
   logger,
 });
+const { putUserRole } = require("../controllers/admin");
 
-const {
-  postSignup,
-  postSignin,
-  patchPassword,
-  patchProfile,
-  getProfile,
-} = require("../controllers/users");
-
-router.post("/sign-up", postSignup);
-router.post("/sign-in", postSignin);
-router.patch("/password", auth, patchPassword);
-router.patch("/profile", auth, patchProfile);
-router.get("/profile", auth, getProfile);
+router.put("/users/role", auth, putUserRole);
 
 module.exports = router;
