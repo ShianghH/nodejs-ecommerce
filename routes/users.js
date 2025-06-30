@@ -26,6 +26,7 @@ const {
   patchPassword,
   patchProfile,
   getProfile,
+  postApplyAdmin,
 } = require("../controllers/users");
 
 router.post("/sign-up", postSignup);
@@ -33,5 +34,6 @@ router.post("/sign-in", postSignin);
 router.patch("/password", auth, patchPassword);
 router.patch("/profile", auth, patchProfile);
 router.get("/profile", auth, getProfile);
+router.post("/apply-admin", auth, postApplyAdmin);
 
 module.exports = router;

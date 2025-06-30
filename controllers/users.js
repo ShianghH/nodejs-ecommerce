@@ -93,7 +93,7 @@ const postSignup = async (req, res, next) => {
 
     // 輸出日誌：記錄成功建立使用者的 ID
     logger.info("新建立的使用者ID:", savedUser.id);
-    res.status(200).json({
+    res.status(201).json({
       status: "success",
       message: "註冊成功",
       data: {
@@ -368,10 +368,45 @@ const getProfile = async (req, res, next) => {
   }
 };
 
+const postApplyAdmin = async (req, res, next) => {
+  try {
+    const user = req.user;
+    const roleRepository = dataSource.getRepository("UserRole");
+
+    //檢查是否已經是 seller
+    const existingSellerRole = await roleRepository.findOne({
+      where: {
+        user: { id: user.id },
+        rolename: "admin",
+      },
+    });
+    if (existingSellerRole) {
+      res.status(409).json({
+        status: "failed",
+        message: "身分已建立，無須重複申請",
+      });
+      return;
+    }
+    const result = await roleRepository.insert({
+      user,
+      rolename: "admin",
+    });
+    logger.info(`使用者 ${user.email} 成功成為管理員`, result);
+    res.status(201).json({
+      status: "success",
+      message: "你現在已經是管理員啦！請小心使用權限",
+    });
+  } catch (error) {
+    logger.error("申請成為管理原時發生錯誤:", error);
+    next(error);
+  }
+};
+
 module.exports = {
   postSignup,
   postSignin,
   patchPassword,
   patchProfile,
   getProfile,
+  postApplyAdmin,
 };

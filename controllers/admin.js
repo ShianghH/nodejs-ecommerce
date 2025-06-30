@@ -1,5 +1,5 @@
 const { dataSource } = require("../db/data-source");
-const logger = require("../utils/logger")("AdminController");
+const logger = require("../utils/logger")("SellerController");
 
 const config = require("../config/index");
 
@@ -9,8 +9,11 @@ const {
   isNotValidInteger,
 } = require("../utils/validators");
 
-const putUserRole = async (req, res, next) => {};
+const postProduct = async (req, res, next) => {
+  try {
+  } catch (error) {}
+};
 
 module.exports = {
-  putUserRole,
+  postProduct,
 };
