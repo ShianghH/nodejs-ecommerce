@@ -11,7 +11,9 @@ function generateError(
 }
 
 module.exports = (req, res, next) => {
-  if (!req.user || req.user.role !== "admin") {
+  // 支援 roles 陣列，例如 ['user', 'admin']
+  const roles = req.user?.roles?.map((r) => r.rolename) || [];
+  if (!roles.includes("admin")) {
     next(generateError());
     return;
   }

@@ -1,6 +1,5 @@
 const { EntitySchema } = require("typeorm");
 
-
 module.exports = new EntitySchema({
   name: "User",
   tableName: "users",
@@ -54,6 +53,14 @@ module.exports = new EntitySchema({
       updateDate: true,
       nullable: false,
       comment: "最後修改時間",
+    },
+  },
+  relations: {
+    roles: {
+      target: "UserRole",
+      type: "one-to-many",
+      inverseSide: "user",
+      cascade: false,
     },
   },
 });

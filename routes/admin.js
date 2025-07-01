@@ -19,9 +19,10 @@ const auth = require("../middlewares/auth.js")({
   //把登入錯誤或成功的 log 記下來
   logger,
 });
-const { postProduct } = require("../controllers/admin.js");
+const { postProduct, postCategory } = require("../controllers/admin.js");
 const isAdmin = require("../middlewares/isAdmin.js");
 
+router.post("/category", auth, isAdmin, postCategory);
 router.post("/products", auth, isAdmin, postProduct);
 
 module.exports = router;
