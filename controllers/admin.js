@@ -1,8 +1,6 @@
 const { dataSource } = require("../db/data-source");
 const logger = require("../utils/logger")("AdminController");
 
-const config = require("../config/index");
-
 const {
   isUndefined,
   isNotValidString,
@@ -93,7 +91,8 @@ const postProduct = async (req, res, next) => {
       isUndefined(price) ||
       isNaN(Number(price)) ||
       typeof isActive !== "boolean" ||
-      (description !== undefined && isNotValidString(description))
+      (description !== undefined &&
+        (isNotValidString(description) || description.trim().length > 1000))
     ) {
       res.status(400).json({
         status: "failed",
@@ -170,7 +169,7 @@ const postProduct = async (req, res, next) => {
       },
     });
   } catch (error) {
-    logger.error("建立產品失敗");
+    logger.error(`[Product] 建立產品失敗: ${error.message}`);
     next(error);
   }
 };
