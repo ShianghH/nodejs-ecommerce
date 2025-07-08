@@ -20,9 +20,12 @@ const isNotValidUUID = (value) => {
   return !uuidRegex.test(value.trim());
 };
 
+const numberReg = /^[0-9]+$/; //檢查一段字串是不是「只包含數字」
+
 module.exports = {
   isUndefined,
   isNotValidString,
   isNotValidInteger,
   isNotValidUUID,
+  numberReg,
 };

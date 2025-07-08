@@ -36,4 +36,11 @@ module.exports = new EntitySchema({
       comment: "最後更新時間",
     },
   },
+  relations: {
+    products: {
+      type: "one-to-many",
+      target: "Product",
+      inverseSide: "category",
+    },
+  },
 });

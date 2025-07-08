@@ -7,7 +7,7 @@ const config = require("../config/index");
 //連接資料庫，取得資料倉庫工具（Repository）
 const { dataSource } = require("../db/data-source.js");
 
-// 建立一個紀錄器，用來記錄登入過程、錯誤等等，標籤叫 "Seller"
+// 建立一個紀錄器，用來記錄登入過程、錯誤等等，標籤叫 "Admin"
 const logger = require("../utils/logger.js")("Admin");
 
 //初始化「身分驗證機器人」auth，傳入它需要的工具
@@ -19,8 +19,9 @@ const auth = require("../middlewares/auth.js")({
   //把登入錯誤或成功的 log 記下來
   logger,
 });
-const { postProduct, postCategory } = require("../controllers/admin.js");
 const isAdmin = require("../middlewares/isAdmin.js");
+
+const { postProduct, postCategory } = require("../controllers/admin.js");
 
 router.post("/category", auth, isAdmin, postCategory);
 router.post("/products", auth, isAdmin, postProduct);

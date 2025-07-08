@@ -7,9 +7,8 @@ const {
   isNotValidString,
   isNotValidInteger,
   isNotValidUUID,
+  numberReg,
 } = require("../utils/validators");
-
-const numberReg = /^[0-9]+$/; //檢查一段字串是不是「只包含數字」
 
 const getProducts = async (req, res, next) => {
   try {
@@ -68,6 +67,7 @@ const getProducts = async (req, res, next) => {
         where: productWhereOptions,
         relations: {
           category: true, // 關聯 Category
+          images: true,
         },
         select: {
           id: true,
@@ -89,18 +89,24 @@ const getProducts = async (req, res, next) => {
       });
 
     // 整理回傳格式
-    const formatted = products.map((p) => ({
-      id: p.id,
-      name: p.name,
-      price: p.price,
-      discount_price: p.discount_price,
-      is_active: p.is_active,
-      category: {
-        id: p.category?.id,
-        name: p.category?.name,
-      },
-      created_at: p.created_at,
-    }));
+    const formatted = products.map((p) => {
+      // 從 images 陣列中找出主圖（is_main 為 true）
+      const mainImage = p.images?.find((img) => img.is_main);
+
+      return {
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        discount_price: p.discount_price,
+        is_active: p.is_active,
+        main_image: mainImage?.image_url || null,
+        category: {
+          id: p.category?.id,
+          name: p.category?.name,
+        },
+        created_at: p.created_at,
+      };
+    });
 
     return res.status(200).json({
       status: "success",
@@ -120,6 +126,65 @@ const getProducts = async (req, res, next) => {
   }
 };
 
+const getProductDetail = async (req, res, next) => {
+  try {
+    const { product_id: productId } = req.params;
+    if (
+      isNotValidString(productId) ||
+      isUndefined(productId) ||
+      isNotValidUUID(productId)
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位未填寫正確",
+      });
+      return;
+    }
+    const productDetail = await dataSource.getRepository("Product").findOne({
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        discount_price: true,
+        description: true,
+        is_active: true,
+        category: {
+          name: true,
+        },
+        created_at: true,
+        updated_at: true,
+      },
+      where: { id: productId },
+      relations: { category: true },
+    });
+    if (!productDetail) {
+      res.status(404).json({
+        status: "failed",
+        message: "商品ID不存在",
+      });
+      return;
+    }
+    const productTag = await dataSource.getRepository("Tag").find({
+      select: {
+        id: true,
+        name: true,
+      },
+      where: {
+        products: {
+          id: productId,
+        },
+      },
+      relations: {
+        products: true,
+      },
+    });
+  } catch (error) {
+    logger.error(`[ProductId] 查詢產品詳細失敗:${error.message}`);
+    next(error);
+  }
+};
+
 module.exports = {
   getProducts,
+  getProductDetail,
 };

@@ -10,6 +10,7 @@ const logger = require("./utils/logger")("App");
 const usersRouter = require("./routes/users");
 const adminRouter = require("./routes/admin");
 const productsRouter = require("./routes/products");
+const categoryRouter = require("./routes/category");
 
 console.log("[Render][app] 所有 routes 載入完成");
 
@@ -43,6 +44,7 @@ app.get("/healthcheck", (req, res) => {
 app.use("/api/v1/users", usersRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/products", productsRouter);
+app.use("/api/v1/category", categoryRouter);
 
 console.log("[Render][app] 所有 API route 註冊完成");
 
