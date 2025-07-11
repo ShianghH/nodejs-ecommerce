@@ -11,6 +11,7 @@ const usersRouter = require("./routes/users");
 const adminRouter = require("./routes/admin");
 const productsRouter = require("./routes/products");
 const categoryRouter = require("./routes/category");
+const ordersRouter = require("./routes/orders");
 
 console.log("[Render][app] 所有 routes 載入完成");
 
@@ -45,6 +46,7 @@ app.use("/api/v1/users", usersRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/products", productsRouter);
 app.use("/api/v1/category", categoryRouter);
+app.use("/api/v1/orders", ordersRouter);
 
 console.log("[Render][app] 所有 API route 註冊完成");
 

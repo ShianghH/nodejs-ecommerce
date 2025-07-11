@@ -73,20 +73,12 @@ module.exports = new EntitySchema({
       inverseSide: "product",
       cascade: false,
     },
-    tags: {
-      target: "Tag",
-      type: "many-to-many",
-      joinTable: {
-        name: "product_tags",
-        joinColumn: {
-          name: "product_id",
-          referencedColumnName: "id",
-        },
-        inverseJoinColumn: {
-          name: "tag_id",
-          referencedColumnName: "id",
-        },
-      },
+
+    productTags: {
+      target: "ProductTag",
+      type: "one-to-many",
+      inverseSide: "product",
+      cascade: true,
     },
   },
 });

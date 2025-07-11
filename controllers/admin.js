@@ -151,6 +151,7 @@ const postProduct = async (req, res, next) => {
       });
       return;
     }
+    // === 建立主商品 ===
     const productRepository = await dataSource.getRepository("Product");
     const newProduct = await productRepository.create({
       name,
@@ -160,12 +161,44 @@ const postProduct = async (req, res, next) => {
       description,
       is_active: isActive,
     });
-    const saveProduct = await productRepository.save(newProduct);
+    const savedProduct = await productRepository.save(newProduct);
+    // === 建立 images / variants / tags（透過中介表）===
+    await Promise.all([
+      // 1. images
+      ...images.map((img) =>
+        dataSource.getRepository("ProductImage").save({
+          product: { id: savedProduct.id },
+          image_url: img.image_url,
+          is_main: img.is_main,
+          sort_order: img.sort_order ?? 0,
+        })
+      ),
+
+      // 2. variants
+      ...variants.map((v) =>
+        dataSource.getRepository("ProductVariant").save({
+          product: { id: savedProduct.id },
+          option_name: v.option_name,
+          value: v.value,
+          stock: v.stock,
+        })
+      ),
+
+      // 3. tags → 保存到 product_tags
+      ...tags.map((tagId, idx) =>
+        dataSource.getRepository("ProductTag").save({
+          product: { id: savedProduct.id },
+          tag: { id: tagId },
+          sort_order: idx,
+        })
+      ),
+    ]);
+
     res.status(201).json({
       status: "success",
       message: "產品新增成功",
       data: {
-        product_id: saveProduct.id,
+        product_id: savedProduct.id,
       },
     });
   } catch (error) {

@@ -140,20 +140,8 @@ const getProductDetail = async (req, res, next) => {
       });
       return;
     }
+    //查主要欄位 + 分類
     const productDetail = await dataSource.getRepository("Product").findOne({
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        discount_price: true,
-        description: true,
-        is_active: true,
-        category: {
-          name: true,
-        },
-        created_at: true,
-        updated_at: true,
-      },
       where: { id: productId },
       relations: { category: true },
     });
@@ -164,19 +152,52 @@ const getProductDetail = async (req, res, next) => {
       });
       return;
     }
-    const productTag = await dataSource.getRepository("Tag").find({
-      select: {
-        id: true,
-        name: true,
+    // 抓圖片、變體、標籤
+    const [images, variants, productTags] = await Promise.all([
+      dataSource.getRepository("ProductImage").find({
+        where: { product: { id: productId } },
+        order: { sort_order: "ASC" },
+        select: ["image_url", "is_main", "sort_order"],
+      }),
+      dataSource.getRepository("ProductVariant").find({
+        where: { product: { id: productId } },
+        select: ["id", "option_name", "value", "stock"],
+      }),
+      dataSource.getRepository("ProductTag").find({
+        where: { product: { id: productId } },
+        relations: { tag: true },
+        order: { sort_order: "ASC" },
+      }),
+    ]);
+
+    // 只保留 Tag 物件（或想要的欄位）
+    const tags = productTags.map((pt) => ({
+      id: pt.tag.id,
+      name: pt.tag.name,
+    }));
+    //組裝並回傳
+    const responseData = {
+      id: productDetail.id,
+      name: productDetail.name,
+      price: productDetail.price,
+      discount_price: productDetail.discount_price,
+      description: productDetail.description,
+      is_active: productDetail.is_active,
+      category: {
+        id: productDetail.category.id,
+        name: productDetail.category.name,
+        description: productDetail.category.description,
       },
-      where: {
-        products: {
-          id: productId,
-        },
-      },
-      relations: {
-        products: true,
-      },
+      images,
+      variants,
+      tags,
+      created_at: productDetail.created_at,
+      updated_at: productDetail.updated_at,
+    };
+    res.status(200).json({
+      status: "success",
+      message: "查詢成功",
+      data: responseData,
     });
   } catch (error) {
     logger.error(`[ProductId] 查詢產品詳細失敗:${error.message}`);
