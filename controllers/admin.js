@@ -34,9 +34,8 @@ const postCategory = async (req, res, next) => {
       });
       return;
     }
-    const categoryRepository = await dataSource.getRepository(
-      "ProductCategory"
-    );
+    const categoryRepository =
+      await dataSource.getRepository("ProductCategory");
     //檢查名稱是否重複
     const existing = await categoryRepository.findOneBy({ name });
     if (existing) {
@@ -116,7 +115,7 @@ const postProduct = async (req, res, next) => {
           !img.image_url ||
           isNotValidString(img.image_url) ||
           typeof img.is_main !== "boolean" ||
-          (img.sort_order !== undefined && isNotValidInteger(img.sort_order))
+          (img.sort_order !== undefined && isNotValidInteger(img.sort_order)),
       )
     ) {
       res.status(400).json({
@@ -135,7 +134,7 @@ const postProduct = async (req, res, next) => {
           isUndefined(v.value) ||
           isNotValidString(v.value) ||
           isUndefined(v.stock) ||
-          isNotValidInteger(v.stock)
+          isNotValidInteger(v.stock),
       )
     ) {
       res.status(400).json({
@@ -162,37 +161,52 @@ const postProduct = async (req, res, next) => {
       is_active: isActive,
     });
     const savedProduct = await productRepository.save(newProduct);
-    // === 建立 images / variants / tags（透過中介表）===
+    // === 建立 images / variants ===
     await Promise.all([
-      // 1. images
       ...images.map((img) =>
         dataSource.getRepository("ProductImage").save({
           product: { id: savedProduct.id },
           image_url: img.image_url,
           is_main: img.is_main,
           sort_order: img.sort_order ?? 0,
-        })
+        }),
       ),
-
-      // 2. variants
       ...variants.map((v) =>
         dataSource.getRepository("ProductVariant").save({
           product: { id: savedProduct.id },
           option_name: v.option_name,
           value: v.value,
           stock: v.stock,
-        })
-      ),
-
-      // 3. tags → 保存到 product_tags
-      ...tags.map((tagId, idx) =>
-        dataSource.getRepository("ProductTag").save({
-          product: { id: savedProduct.id },
-          tag: { id: tagId },
-          sort_order: idx,
-        })
+        }),
       ),
     ]);
+
+    // === 處理 Tags：若不存在就建立 ===
+    const tagRepository = dataSource.getRepository("Tag");
+    const tagEntities = [];
+
+    for (const tagName of tags) {
+      // 先查是否存在
+      let tag = await tagRepository.findOneBy({ name: tagName });
+
+      // 若不存在，建立新 tag
+      if (!tag) {
+        tag = await tagRepository.save(tagRepository.create({ name: tagName }));
+      }
+
+      tagEntities.push(tag);
+    }
+
+    // 寫入 product_tags 中介表
+    await Promise.all(
+      tagEntities.map((tag, idx) =>
+        dataSource.getRepository("ProductTag").save({
+          product: { id: savedProduct.id },
+          tag,
+          sort_order: idx,
+        }),
+      ),
+    );
 
     res.status(201).json({
       status: "success",

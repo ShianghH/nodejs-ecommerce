@@ -24,7 +24,7 @@ const config = {
   // collectCoverageFrom: undefined,
 
   // The directory where Jest should output its coverage files
-  coverageDirectory: 'coverage',
+  coverageDirectory: "coverage",
 
   // An array of regexp pattern strings used to skip coverage collection
   // coveragePathIgnorePatterns: [
@@ -32,7 +32,7 @@ const config = {
   // ],
 
   // Indicates which provider should be used to instrument code for coverage
-  coverageProvider: 'v8',
+  coverageProvider: "v8",
 
   // A list of reporter names that Jest uses when writing coverage reports
   // coverageReporters: [
@@ -144,7 +144,7 @@ const config = {
   // snapshotSerializers: [],
 
   // The test environment that will be used for testing
-  testEnvironment: 'node',
+  testEnvironment: "node",
 
   // Options that will be passed to the testEnvironment
   // testEnvironmentOptions: {},
@@ -165,7 +165,7 @@ const config = {
 
   // The regexp pattern or array of patterns that Jest uses to detect test files
   // regex is test folder.
-  testRegex: ['test/.*\\.(test|spec)\\.js$']
+  testRegex: ["test/.*\\.(test|spec)\\.js$"],
 
   // This option allows the use of a custom results processor
   // testResultsProcessor: undefined,
@@ -193,6 +193,6 @@ const config = {
 
   // Whether to use watchman for file crawling
   // watchman: true,
-}
+};
 
-module.exports = config
+module.exports = config;

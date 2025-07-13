@@ -22,10 +22,13 @@ const isNotValidUUID = (value) => {
 
 const numberReg = /^[0-9]+$/; //檢查一段字串是不是「只包含數字」
 
+const telReg = /^09\d{8}$/;
+
 module.exports = {
   isUndefined,
   isNotValidString,
   isNotValidInteger,
   isNotValidUUID,
   numberReg,
+  telReg,
 };

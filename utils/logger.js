@@ -8,6 +8,6 @@ module.exports = function getLogger(prefix, logLevel = "debug") {
       messageFormat: `[${prefix}]: {msg}`,
       colorize: true,
       sync: true,
-    })
+    }),
   );
 };

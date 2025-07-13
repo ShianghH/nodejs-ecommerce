@@ -19,13 +19,13 @@ function formatVerifyError(jwtError) {
     case "TokenExpiredError":
       result = generateError(
         PERMISSION_DENIED_STATUS_CODE,
-        FailedMessageMap.expired
+        FailedMessageMap.expired,
       );
       break;
     default:
       result = generateError(
         PERMISSION_DENIED_STATUS_CODE,
-        FailedMessageMap.invalid
+        FailedMessageMap.invalid,
       );
       break;
   }
@@ -56,7 +56,7 @@ module.exports = ({ secret, userRepository, logger = console }) => {
   ) {
     logger.error("[AuthV2] userRepository is required and must be a function.");
     throw new Error(
-      "[AuthV2] userRepository is required and must be a function."
+      "[AuthV2] userRepository is required and must be a function.",
     );
   }
   return async (req, res, next) => {
@@ -67,7 +67,7 @@ module.exports = ({ secret, userRepository, logger = console }) => {
     ) {
       logger.warn("[AuthV2] Missing authorization header.");
       next(
-        generateError(PERMISSION_DENIED_STATUS_CODE, FailedMessageMap.missing)
+        generateError(PERMISSION_DENIED_STATUS_CODE, FailedMessageMap.missing),
       );
       return;
     }
@@ -75,7 +75,7 @@ module.exports = ({ secret, userRepository, logger = console }) => {
     if (!token) {
       logger.warn("[AuthV2] Missing token.");
       next(
-        generateError(PERMISSION_DENIED_STATUS_CODE, FailedMessageMap.missing)
+        generateError(PERMISSION_DENIED_STATUS_CODE, FailedMessageMap.missing),
       );
       return;
     }
@@ -87,7 +87,10 @@ module.exports = ({ secret, userRepository, logger = console }) => {
       });
       if (!user) {
         next(
-          generateError(PERMISSION_DENIED_STATUS_CODE, FailedMessageMap.invalid)
+          generateError(
+            PERMISSION_DENIED_STATUS_CODE,
+            FailedMessageMap.invalid,
+          ),
         );
         return;
       }
