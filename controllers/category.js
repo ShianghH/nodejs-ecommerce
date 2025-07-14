@@ -26,7 +26,7 @@ const getCategories = async (req, res, next) => {
       return;
     }
     const categories = await dataSource.getRepository("ProductCategory").find({
-      select: ["id", "name", "created_at", "updated_at"],
+      select: ["id", "name"],
       skip,
       take: perPage,
     });

@@ -56,36 +56,58 @@ const postOrder = async (req, res, next) => {
       });
       return;
     }
-    //先查變體並計算金額
+    //驗證產品ID、變體ID是否存在
+    const productRepo = await dataSource.getRepository("Product");
     const variantRepo = dataSource.getRepository("ProductVariant");
-    const orderItemData = await Promise.all(
-      orderItems.map(async (it) => {
-        const variant = await variantRepo.findOne({
-          where: { id: it.variant_id },
-          relations: { product: true },
+
+    const orderItemData = [];
+
+    for (const it of orderItems) {
+      // 先確認 product 存在
+      const product = await productRepo.findOne({
+        where: { id: it.product_id },
+        select: ["id", "price", "discount_price"],
+      });
+      if (!product) {
+        logger.warn(`[Product] 無此產品ID ${it.product_id}`);
+        res.status(404).json({
+          status: "failed",
+          message: "找不到商品",
         });
-        if (!variant) throw new Error(`找不到商品規格: ${it.variant_id}`);
+        return;
+      }
 
-        const original = Number(variant.product.price);
-        const unit = Number(variant.product.discount_price || original);
-        const subtotal = unit * it.quantity;
+      // 查 variant並確定隸屬於剛剛那個 product
+      const variant = await variantRepo.findOne({
+        where: { id: it.variant_id, product: { id: it.product_id } }, // 🔸 雙條件
+        relations: { product: true },
+      });
+      if (!variant) {
+        logger.warn(`[Variant] 商品規錯誤 ${it.variant_id}`);
+        res.status(404).json({
+          status: "failed",
+          message: "商品規格錯誤",
+        });
+        return;
+      }
 
-        return {
-          variant_id: it.variant_id,
-          quantity: it.quantity,
-          original_price: original,
-          unit_price: unit,
-          subtotal,
-        };
-      })
-    );
-
+      //  計算金額
+      const original = Number(product.price);
+      const unit = Number(product.discount_price ?? original);
+      orderItemData.push({
+        variant_id: it.variant_id,
+        quantity: it.quantity,
+        original_price: original,
+        unit_price: unit,
+        subtotal: unit * it.quantity,
+      });
+    }
     const totalBefore = orderItemData.reduce(
       (sum, i) => sum + i.original_price * i.quantity,
       0
     );
     const totalAfter = orderItemData.reduce((sum, i) => sum + i.subtotal, 0);
-    const discountAmt = totalBefore - totalAfter; // 目前沒折扣就會是 0
+    const discountAmt = totalBefore - totalAfter;
 
     /* 3. 建立主訂單 ---------------------------------------------------- */
     const { id: userId } = req.user;
@@ -100,10 +122,9 @@ const postOrder = async (req, res, next) => {
         shipping_phone: shippingPhone,
         shipping_address: shippingAddress,
         payment_method: { id: paymentMethodId },
-
         total_before_discount: totalBefore,
         discount_amount: discountAmt,
-        subtotal: totalAfter, // 實際應付
+        subtotal: totalAfter,
       })
     );
 
@@ -132,6 +153,15 @@ const postOrder = async (req, res, next) => {
   }
 };
 
+const getOrder = async (req, res, next) => {
+  try {
+  } catch (error) {
+    logger.error(`[Order] 查詢訂單失敗 `);
+    next(error);
+  }
+};
+
 module.exports = {
   postOrder,
+  getOrder,
 };

@@ -46,7 +46,7 @@ const postSignup = async (req, res, next) => {
     }
     if (!passwordPattern.test(password)) {
       logger.warn(
-        "建立使用者錯誤: 密碼不符合規則，需要包含英文數字大小寫，長度 8～32 字元",
+        "建立使用者錯誤: 密碼不符合規則，需要包含英文數字大小寫，長度 8～32 字元"
       );
       res.status(400).json({
         status: "failed",
@@ -101,8 +101,6 @@ const postSignup = async (req, res, next) => {
           id: savedUser.id,
           name: savedUser.name,
           email: savedUser.email,
-          created_at: savedUser.created_at,
-          updated_at: savedUser.updated_at,
         },
       },
     });
@@ -176,7 +174,7 @@ const postSignin = async (req, res, next) => {
       {
         // token 有效期限，例如 '7d'
         expiresIn: `${config.get("secret.jwtExpiresDay")}`,
-      },
+      }
     );
     res.status(200).json({
       status: "success",
@@ -224,7 +222,7 @@ const patchPassword = async (req, res, next) => {
       !passwordPattern.test(confirmNewPassword)
     ) {
       logger.warn(
-        "密碼不符合規則，需要包含英文數字大小寫，最短8個字，最長16個字",
+        "密碼不符合規則，需要包含英文數字大小寫，最短8個字，最長16個字"
       );
       res.status(400).json({
         status: "failed",
@@ -268,7 +266,7 @@ const patchPassword = async (req, res, next) => {
     const hashPassword = await bcrypt.hash(newPassword, salt);
     const updatedResult = await userRepository.update(
       { id },
-      { password: hashPassword },
+      { password: hashPassword }
     );
     if (updatedResult.affected === 0) {
       logger.error(`[PATCH /users/password] 更新失敗 - user: ${id}`);

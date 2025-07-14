@@ -115,7 +115,7 @@ const postProduct = async (req, res, next) => {
           !img.image_url ||
           isNotValidString(img.image_url) ||
           typeof img.is_main !== "boolean" ||
-          (img.sort_order !== undefined && isNotValidInteger(img.sort_order)),
+          (img.sort_order !== undefined && isNotValidInteger(img.sort_order))
       )
     ) {
       res.status(400).json({
@@ -134,7 +134,7 @@ const postProduct = async (req, res, next) => {
           isUndefined(v.value) ||
           isNotValidString(v.value) ||
           isUndefined(v.stock) ||
-          isNotValidInteger(v.stock),
+          isNotValidInteger(v.stock)
       )
     ) {
       res.status(400).json({
@@ -169,7 +169,7 @@ const postProduct = async (req, res, next) => {
           image_url: img.image_url,
           is_main: img.is_main,
           sort_order: img.sort_order ?? 0,
-        }),
+        })
       ),
       ...variants.map((v) =>
         dataSource.getRepository("ProductVariant").save({
@@ -177,7 +177,7 @@ const postProduct = async (req, res, next) => {
           option_name: v.option_name,
           value: v.value,
           stock: v.stock,
-        }),
+        })
       ),
     ]);
 
@@ -204,8 +204,8 @@ const postProduct = async (req, res, next) => {
           product: { id: savedProduct.id },
           tag,
           sort_order: idx,
-        }),
-      ),
+        })
+      )
     );
 
     res.status(201).json({
@@ -221,7 +221,50 @@ const postProduct = async (req, res, next) => {
   }
 };
 
+const postPaymentMethod = async (req, res, next) => {
+  try {
+    const { name } = req.body;
+    if (
+      isUndefined(name) ||
+      isNotValidString(name) ||
+      name.trim().length < 2 ||
+      name.trim().length > 50
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤",
+      });
+      return;
+    }
+    const payRepository = await dataSource.getRepository("PaymentMethod");
+    const payExisting = await payRepository.findOneBy({ name });
+    if (payExisting) {
+      res.status(409).json({
+        status: "failed",
+        message: "付款名稱已存在，請使用其他名稱",
+      });
+      return;
+    }
+    const newPay = payRepository.create({
+      name,
+    });
+    const savePay = await payRepository.save(newPay);
+    res.status(201).json({
+      status: "success",
+      message: "付款方式建立成功",
+      data: {
+        id: savePay.id,
+        name: savePay.name,
+      },
+    });
+  } catch (error) {
+    logger.error(`[Admin] 新增付款失敗: ${error.message}`, error);
+    next(error);
+  }
+};
+
 module.exports = {
   postCategory,
   postProduct,
+  postPaymentMethod,
 };

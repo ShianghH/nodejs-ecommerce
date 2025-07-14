@@ -21,9 +21,14 @@ const auth = require("../middlewares/auth.js")({
 });
 const isAdmin = require("../middlewares/isAdmin.js");
 
-const { postProduct, postCategory } = require("../controllers/admin.js");
+const {
+  postProduct,
+  postCategory,
+  postPaymentMethod,
+} = require("../controllers/admin.js");
 
 router.post("/category", auth, isAdmin, postCategory);
 router.post("/products", auth, isAdmin, postProduct);
+router.post("/paymentmethod", auth, isAdmin, postPaymentMethod);
 
 module.exports = router;

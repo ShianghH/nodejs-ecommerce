@@ -74,7 +74,6 @@ const getProducts = async (req, res, next) => {
           name: true,
           price: true,
           discount_price: true,
-          is_active: true,
           created_at: true,
           category: {
             id: true,
@@ -98,13 +97,11 @@ const getProducts = async (req, res, next) => {
         name: p.name,
         price: p.price,
         discount_price: p.discount_price,
-        is_active: p.is_active,
         main_image: mainImage?.image_url || null,
         category: {
           id: p.category?.id,
           name: p.category?.name,
         },
-        created_at: p.created_at,
       };
     });
 
@@ -182,7 +179,6 @@ const getProductDetail = async (req, res, next) => {
       price: productDetail.price,
       discount_price: productDetail.discount_price,
       description: productDetail.description,
-      is_active: productDetail.is_active,
       category: {
         id: productDetail.category.id,
         name: productDetail.category.name,
@@ -192,7 +188,6 @@ const getProductDetail = async (req, res, next) => {
       variants,
       tags,
       created_at: productDetail.created_at,
-      updated_at: productDetail.updated_at,
     };
     res.status(200).json({
       status: "success",

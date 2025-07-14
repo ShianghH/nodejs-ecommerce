@@ -7,13 +7,13 @@ module.exports = new EntitySchema({
     id: {
       primary: true,
       type: "integer",
-      generated: false,
+      generated: true,
       nullable: false,
       comment: "付款方式主鍵",
     },
     name: {
       type: "varchar",
-      length: 100,
+      length: 50,
       nullable: false,
       comment: "付款方式名稱（如信用卡、ATM）",
     },

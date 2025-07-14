@@ -15,8 +15,9 @@ const auth = require("../middlewares/auth.js")({
   logger,
 });
 
-const { postOrder } = require("../controllers/orders.js");
+const { postOrder, getOrder } = require("../controllers/orders.js");
 
 router.post("/", auth, postOrder);
+router.get("/", auth, getOrder);
 
 module.exports = router;
