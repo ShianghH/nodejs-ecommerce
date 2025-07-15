@@ -155,6 +155,59 @@ const postOrder = async (req, res, next) => {
 
 const getOrder = async (req, res, next) => {
   try {
+    const { page = 1 } = req.query;
+    const userId = req.user.id;
+    const pageToInt = parseInt(page, 10);
+    const perPage = 10;
+    const skip = (pageToInt - 1) * perPage;
+    if (!numberReg.test(page) || pageToInt < 1 || isNaN(pageToInt)) {
+      res.status(400).json({
+        status: "failed",
+        message: "請輸入有效的頁數",
+      });
+      return;
+    }
+    const orderRepo = dataSource.getRepository("Order");
+    const [orders, total] = await orderRepo.findAndCount({
+      where: {
+        user: { id: userId },
+      },
+      relations: {
+        payment_method: true,
+      },
+      select: {
+        id: true,
+        order_status: true,
+        subtotal: true,
+        created_at: true,
+        payment_method: {
+          name: true,
+        },
+      },
+      order: {
+        created_at: "DESC",
+      },
+      skip,
+      take: perPage,
+    });
+    res.status(200).json({
+      status: "success",
+      message: "查詢成功",
+      data: {
+        orders: orders.map((o) => ({
+          order_id: o.id,
+          status: o.order_status,
+          subtotal: o.subtotal,
+          payment: o.payment_method?.name || "未知",
+          created_at: o.created_at,
+        })),
+        pagination: {
+          page: pageToInt,
+          limit: perPage,
+          total,
+        },
+      },
+    });
   } catch (error) {
     logger.error(`[Order] 查詢訂單失敗 `);
     next(error);
