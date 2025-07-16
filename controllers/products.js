@@ -1,5 +1,4 @@
 const { dataSource } = require("../db/data-source");
-const Product = require("../entities/Product");
 const logger = require("../utils/logger")("ProductsController");
 
 const {
