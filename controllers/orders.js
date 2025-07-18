@@ -10,6 +10,7 @@ const {
   numberReg,
   telReg,
 } = require("../utils/validators");
+const PaymentMethod = require("../entities/PaymentMethod");
 
 const postOrder = async (req, res, next) => {
   try {
@@ -214,7 +215,86 @@ const getOrder = async (req, res, next) => {
   }
 };
 
+const getOrderDetail = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { order_id: orderId } = req.params;
+    if (
+      isUndefined(orderId) ||
+      isNotValidString(orderId) ||
+      isNotValidUUID(orderId)
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤",
+      });
+      return;
+    }
+    //查有無訂單
+    const orderRepo = dataSource.getRepository("Order");
+    const order = await orderRepo.findOne({
+      where: {
+        id: orderId,
+        user: {
+          id: userId,
+        },
+      },
+      relations: {
+        payment_method: true,
+      },
+    });
+    if (!order) {
+      res.status(404).json({
+        status: "failed",
+        message: "查無此訂單",
+      });
+      return;
+    }
+    //查訂單項目 + 商品規格 + 商品
+    const orderItems = await dataSource.getRepository("OrderItem").find({
+      where: {
+        order: { id: orderId },
+      },
+      relations: {
+        product_variant: {
+          product: true,
+        },
+      },
+    });
+    const items = orderItems.map((i) => ({
+      product_name: i.product_variant.product.name,
+      option_name: i.product_variant.option_name,
+      value: i.product_variant.value,
+      quantity: i.quantity,
+      original_price: i.original_price,
+      unit_price: i.unit_price,
+      subtotal: i.subtotal,
+    }));
+    res.status(200).json({
+      status: "success",
+      message: "查詢成功",
+      data: {
+        order: {
+          id: order.id,
+          order_status: order.order_status,
+          shipping_name: order.shipping_name,
+          shipping_phone: order.shippingPhone,
+          shipping_address: order.shipping_address,
+          payment: order.payment_method.name,
+          subtotal: order.subtotal,
+          items,
+          created_at: order.created_at,
+        },
+      },
+    });
+  } catch (error) {
+    logger.warn(`[Order] 查詢訂單錯誤}`, error);
+    next(error);
+  }
+};
+
 module.exports = {
   postOrder,
   getOrder,
+  getOrderDetail,
 };
