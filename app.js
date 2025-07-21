@@ -13,6 +13,7 @@ const productsRouter = require("./routes/products");
 const categoryRouter = require("./routes/category");
 const ordersRouter = require("./routes/orders");
 const favoritesRouter = require("./routes/favorites");
+const cartRouter = require("./routes/cart");
 
 console.log("[Render][app] 所有 routes 載入完成");
 
@@ -49,6 +50,7 @@ app.use("/api/v1/products", productsRouter);
 app.use("/api/v1/category", categoryRouter);
 app.use("/api/v1/orders", ordersRouter);
 app.use("/api/v1/favorites", favoritesRouter);
+app.use("/api/v1/cart", cartRouter);
 
 console.log("[Render][app] 所有 API route 註冊完成");
 
