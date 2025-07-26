@@ -263,8 +263,50 @@ const postPaymentMethod = async (req, res, next) => {
   }
 };
 
+const patchProduct = async (req, res, next) => {
+  try {
+    const { product_id: productId } = req.params;
+    const {
+      name,
+      category_id,
+      description,
+      price,
+      discount_price,
+      is_active,
+      images,
+      variants,
+      tags,
+    } = req.body;
+    if (!isValidUUID(productId)) {
+      res.status(400).json({
+        status: "failed",
+        message: "商品 ID 格式錯誤",
+      });
+      return;
+    }
+    if (
+      (name && isNotValidString(name)) ||
+      (description && isNotValidString(description)) ||
+      (price && isNotValidInteger(price)) ||
+      (discount_price && isNotValidInteger(discount_price)) ||
+      (is_active !== undefined && typeof is_active !== "boolean") ||
+      (category_id && isNotValidUUID(category_id)) ||
+      (images && !Array.isArray(images)) ||
+      (variants && !Array.isArray(variants)) ||
+      (tags && !Array.isArray(tags))
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤",
+      });
+      return;
+    }
+  } catch (error) {}
+};
+
 module.exports = {
   postCategory,
   postProduct,
   postPaymentMethod,
+  patchProduct,
 };

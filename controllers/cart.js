@@ -70,21 +70,43 @@ const deletetCart = async (req, res, next) => {
     const userId = req.user.id;
     const { cartitem_id: cartItemID } = req.params;
     if (
-      isNotValidUUID(cartItemID) ||
       isUndefined(cartItemID) ||
-      isNotValidString(cartItemID)
+      isNotValidString(cartItemID) ||
+      isNotValidUUID(cartItemID)
     ) {
       res.status(400).json({
         status: "failed",
-        message: "欄位個是錯誤",
+        message: "欄位格式錯誤",
       });
       return;
     }
-    const cartItemRepo = dataSource.getRepository("CartItem");
-    const cartItem = await cartItemRepo.findOne({
+    const cartRepo = dataSource.getRepository("CartItem");
+    const cartItem = await cartRepo.findOne({
       where: {
-        user: { id: userId },
+        id: cartItemID,
       },
+      relations: {
+        user: true,
+      },
+    });
+    if (!cartItem) {
+      res.status(404).json({
+        status: "failed",
+        message: "購物車項目不存在",
+      });
+      return;
+    }
+    if (cartItem.user.id !== userId) {
+      res.status(403).json({
+        status: "failed",
+        message: "您無權刪除這筆購物車項目",
+      });
+      return;
+    }
+    await cartRepo.remove(cartItem);
+    res.status(200).json({
+      status: "success",
+      message: "購物車項目已刪除",
     });
   } catch (error) {
     logger.warn(`[Cart]刪除購物車商品失敗:${error.message}`);

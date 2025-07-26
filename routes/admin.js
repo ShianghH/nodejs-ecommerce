@@ -25,10 +25,12 @@ const {
   postProduct,
   postCategory,
   postPaymentMethod,
+  patchProduct,
 } = require("../controllers/admin.js");
 
 router.post("/category", auth, isAdmin, postCategory);
 router.post("/products", auth, isAdmin, postProduct);
 router.post("/paymentmethod", auth, isAdmin, postPaymentMethod);
+router.patch("/:product_id", auth, isAdmin, patchProduct);
 
 module.exports = router;
