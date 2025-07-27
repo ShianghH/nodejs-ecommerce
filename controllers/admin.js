@@ -301,6 +301,57 @@ const patchProduct = async (req, res, next) => {
       });
       return;
     }
+    //查找商品
+    const productRepo = dataSource.getRepository("Product");
+    const product = await productRepo.findOne({
+      where: {
+        id: productId,
+      },
+      relations: {
+        category: true,
+        images: true,
+        variants: true,
+        tags: true,
+      },
+    });
+    if (!product) {
+      res.status(404).json({
+        status: "failed",
+        message: "商品不存在",
+      });
+      return;
+    }
+    //更新基本欄位
+    if (name) product.name = name;
+    if (description) product.description = description;
+    if (price) product.price = price;
+    if (discount_price) product.discountPrice = discount_price;
+    if (typeof is_active === "boolean") product.is_active = is_active;
+    if (category_id) {
+      const categoryRepo = dataSource.getRepository("Category");
+      const category = await categoryRepo.findOneBy({
+        where: {
+          id: category_id,
+        },
+      });
+      if (!category) {
+        res.status(404).json({
+          status: "failed",
+          message: "分類不存在",
+        });
+        return;
+      }
+      product.category = category;
+    }
+    //重建圖片
+    if (images) {
+      const imageRepo = dataSource.getRepository("ProductImage");
+      const image = await imageRepo.delete({
+        product: {
+          id: productId,
+        },
+      });
+    }
   } catch (error) {}
 };
 
