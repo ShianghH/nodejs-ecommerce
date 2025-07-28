@@ -266,6 +266,8 @@ const postPaymentMethod = async (req, res, next) => {
 const patchProduct = async (req, res, next) => {
   try {
     const { product_id: productId } = req.params;
+    logger.info(`[PATCH] 收到更新商品請求 id: ${productId}`);
+
     const {
       name,
       category_id,
@@ -277,82 +279,127 @@ const patchProduct = async (req, res, next) => {
       variants,
       tags,
     } = req.body;
-    if (!isValidUUID(productId)) {
-      res.status(400).json({
-        status: "failed",
-        message: "商品 ID 格式錯誤",
-      });
-      return;
+
+    if (isNotValidUUID(productId)) {
+      return res
+        .status(400)
+        .json({ status: "failed", message: "商品 ID 格式錯誤" });
     }
-    if (
-      (name && isNotValidString(name)) ||
-      (description && isNotValidString(description)) ||
-      (price && isNotValidInteger(price)) ||
-      (discount_price && isNotValidInteger(discount_price)) ||
-      (is_active !== undefined && typeof is_active !== "boolean") ||
-      (category_id && isNotValidUUID(category_id)) ||
-      (images && !Array.isArray(images)) ||
-      (variants && !Array.isArray(variants)) ||
-      (tags && !Array.isArray(tags))
-    ) {
-      res.status(400).json({
-        status: "failed",
-        message: "欄位格式錯誤",
-      });
-      return;
-    }
-    //查找商品
+
     const productRepo = dataSource.getRepository("Product");
+    const imageRepo = dataSource.getRepository("ProductImage");
+    const variantRepo = dataSource.getRepository("ProductVariant");
+    const categoryRepo = dataSource.getRepository("ProductCategory");
+    const tagRepo = dataSource.getRepository("Tag");
+    const productTagRepo = dataSource.getRepository("ProductTag");
+
     const product = await productRepo.findOne({
-      where: {
-        id: productId,
-      },
+      where: { id: productId },
       relations: {
         category: true,
         images: true,
         variants: true,
-        tags: true,
       },
     });
+
     if (!product) {
-      res.status(404).json({
-        status: "failed",
-        message: "商品不存在",
-      });
-      return;
+      return res.status(404).json({ status: "failed", message: "商品不存在" });
     }
-    //更新基本欄位
+
+    // 更新基本欄位
     if (name) product.name = name;
     if (description) product.description = description;
     if (price) product.price = price;
-    if (discount_price) product.discountPrice = discount_price;
+    if (discount_price) product.discount_price = discount_price;
     if (typeof is_active === "boolean") product.is_active = is_active;
+
+    // 更新分類
     if (category_id) {
-      const categoryRepo = dataSource.getRepository("Category");
-      const category = await categoryRepo.findOneBy({
-        where: {
-          id: category_id,
-        },
+      const category = await categoryRepo.findOne({
+        where: { id: category_id },
       });
       if (!category) {
-        res.status(404).json({
-          status: "failed",
-          message: "分類不存在",
-        });
-        return;
+        return res
+          .status(404)
+          .json({ status: "failed", message: "分類不存在" });
       }
       product.category = category;
     }
-    //重建圖片
-    if (images) {
-      const imageRepo = dataSource.getRepository("ProductImage");
-      const image = await imageRepo.delete({
-        product: {
-          id: productId,
-        },
-      });
+
+    // 刪除舊圖片並重建圖片關聯
+    if (images && Array.isArray(images)) {
+      await imageRepo.delete({ product: { id: productId } });
+
+      product.images = images.map((img) =>
+        imageRepo.create({
+          image_url: img.image_url,
+          is_main: img.is_main,
+          sort_order: img.sort_order ?? 0,
+          product: product, // 給整個實體，避免 null 關聯
+        })
+      );
     }
-  } catch (error) {}
+
+    // 刪除舊 variants 並重建
+    if (variants && Array.isArray(variants)) {
+      await variantRepo.delete({ product: { id: productId } });
+
+      product.variants = variants.map((v) =>
+        variantRepo.create({
+          option_name: v.option_name,
+          value: v.value,
+          stock: v.stock,
+          product: product,
+        })
+      );
+    }
+
+    // 刪除舊 tag 關聯並重建
+    if (tags && Array.isArray(tags)) {
+      await productTagRepo.delete({ product: { id: productId } });
+
+      const tagRelations = [];
+      for (let i = 0; i < tags.length; i++) {
+        const tagName = tags[i];
+        let tag = await tagRepo.findOneBy({ name: tagName });
+
+        if (!tag) {
+          tag = await tagRepo.save(tagRepo.create({ name: tagName }));
+        }
+
+        tagRelations.push(
+          productTagRepo.create({
+            product: product,
+            tag: tag,
+            sort_order: i,
+          })
+        );
+      }
+
+      product.productTags = tagRelations;
+    }
+
+    const updatedProduct = await productRepo.save(product);
+
+    logger.info(`[PATCH] 商品更新成功 id: ${productId}`);
+    res.status(200).json({
+      status: "success",
+      message: "商品更新成功",
+      data: {
+        id: updatedProduct.id,
+        name: updatedProduct.name,
+        price: updatedProduct.price,
+        discount_price: updatedProduct.discount_price,
+        description: updatedProduct.description,
+        is_active: updatedProduct.is_active,
+        category: updatedProduct.category,
+        updated_at: updatedProduct.updated_at,
+      },
+    });
+  } catch (error) {
+    logger.error(`[Admin] 編輯商品失敗`, error);
+    next(error);
+  }
 };
 
 module.exports = {
