@@ -28,6 +28,12 @@ module.exports = new EntitySchema({
       nullable: true,
       comment: "顯示順序（數字越小越前面）",
     },
+    deleted_at: {
+      type: "timestamp",
+      deleteDate: true,
+      nullable: true,
+      comment: "軟刪除時間",
+    },
   },
   relations: {
     product: {

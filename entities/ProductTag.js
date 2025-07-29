@@ -20,6 +20,12 @@ module.exports = new EntitySchema({
       type: "timestamp",
       createDate: true,
     },
+    deleted_at: {
+      type: "timestamp",
+      deleteDate: true,
+      nullable: true,
+      comment: "軟刪除時間",
+    },
   },
   relations: {
     product: {

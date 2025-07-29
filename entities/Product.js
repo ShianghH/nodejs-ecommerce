@@ -49,6 +49,12 @@ module.exports = new EntitySchema({
       nullable: false,
       comment: "最後修改時間",
     },
+    deleted_at: {
+      type: "timestamp",
+      deleteDate: true,
+      nullable: true,
+      comment: "刪除時間（軟刪除）",
+    },
   },
   relations: {
     category: {

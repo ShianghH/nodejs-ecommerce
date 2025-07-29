@@ -1,4 +1,5 @@
 const { dataSource } = require("../db/data-source");
+const { merge } = require("../routes/users");
 const logger = require("../utils/logger")("AdminController");
 
 const {
@@ -402,9 +403,59 @@ const patchProduct = async (req, res, next) => {
   }
 };
 
+const deleteProduct = async (req, res, next) => {
+  try {
+    const { product_id: productId } = req.params;
+    if (
+      isNotValidUUID(productId) ||
+      isNotValidString(productId) ||
+      isUndefined(productId)
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤",
+      });
+      return;
+    }
+    const productRepo = dataSource.getRepository("Product");
+    const imageRepo = dataSource.getRepository("ProductImage");
+    const variantRepo = dataSource.getRepository("ProductVariant");
+    const productTagRepo = dataSource.getRepository("ProductTag");
+    const product = await productRepo.findOne({
+      where: {
+        id: productId,
+      },
+      relations: {
+        images: true,
+        variants: true,
+        productTags: true,
+      },
+    });
+    if (!product) {
+      res.status(404).json({
+        status: "failed",
+        message: "商品不存在",
+      });
+      return;
+    }
+    await productRepo.softDelete(productId);
+    await imageRepo.softDelete({ product: { id: productId } });
+    await variantRepo.softDelete({ product: { id: productId } });
+    await productTagRepo.softDelete({ product: { id: productId } });
+    res.status(200).json({
+      status: "success",
+      message: "刪除商品成功",
+    });
+  } catch (error) {
+    logger.warn(`[DELETE] 刪除產品失敗:${error.message}`);
+    next(error);
+  }
+};
+
 module.exports = {
   postCategory,
   postProduct,
   postPaymentMethod,
   patchProduct,
+  deleteProduct,
 };
