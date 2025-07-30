@@ -1,5 +1,5 @@
 const { dataSource } = require("../db/data-source");
-const { merge } = require("../routes/users");
+
 const logger = require("../utils/logger")("AdminController");
 
 const {
