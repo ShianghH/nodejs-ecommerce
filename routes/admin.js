@@ -27,6 +27,7 @@ const {
   postPaymentMethod,
   patchProduct,
   deleteProduct,
+  deleteTag,
 } = require("../controllers/admin.js");
 
 router.post("/category", auth, isAdmin, postCategory);
@@ -34,5 +35,6 @@ router.post("/products", auth, isAdmin, postProduct);
 router.post("/paymentmethod", auth, isAdmin, postPaymentMethod);
 router.patch("/products/:product_id", auth, isAdmin, patchProduct);
 router.delete("/products/:product_id", auth, isAdmin, deleteProduct);
+router.delete("/tags/:tag_id", auth, isAdmin, deleteTag);
 
 module.exports = router;

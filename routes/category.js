@@ -17,9 +17,10 @@ const auth = require("../middlewares/auth")({
   //把登入錯誤或成功的 log 記下來
   logger,
 });
-
-const { getCategories } = require("../controllers/category");
+const isAdmin = require("../middlewares/isAdmin");
+const { getCategories, deleteCategories } = require("../controllers/category");
 
 router.get("/", getCategories);
+router.delete("/category_id", auth, isAdmin, deleteCategories);
 
 module.exports = router;

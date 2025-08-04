@@ -8,8 +8,8 @@ const {
   isNotValidString,
   isNotValidInteger,
   numberReg,
+  isNotValidUUID,
 } = require("../utils/validators");
-const { messaging } = require("firebase-admin");
 
 const getCategories = async (req, res, next) => {
   try {
@@ -46,7 +46,40 @@ const getCategories = async (req, res, next) => {
     next(error);
   }
 };
+const deleteCategories = async (req, res, next) => {
+  try {
+    const { category_id: categoryId } = req.params;
+    if (
+      isUndefined(categoryId) ||
+      isNotValidUUID(categoryId) ||
+      isNotValidString(categoryId)
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤",
+      });
+      return;
+    }
+    const categoryRepo = dataSource.getRepository("ProductCategory");
+    const existing = await categoryRepo.findOne({
+      where: {
+        id: categoryId,
+      },
+    });
+    if (!existing) {
+      res.status(404).json({
+        status: "failed",
+        message: "分類不存在",
+      });
+      return;
+    }
+  } catch (error) {
+    logger.warn(`[Category] 刪除分類失敗:${error.message}`);
+    next(error);
+  }
+};
 
 module.exports = {
   getCategories,
+  deleteCategories,
 };

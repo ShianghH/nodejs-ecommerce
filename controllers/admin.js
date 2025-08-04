@@ -451,6 +451,41 @@ const deleteProduct = async (req, res, next) => {
     next(error);
   }
 };
+const deleteTag = async (req, res, next) => {
+  try {
+    const { tag_id: TagId } = req.params;
+    if (
+      isUndefined(TagId) ||
+      isNotValidUUID(TagId) ||
+      isNotValidString(TagId)
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤",
+      });
+      return;
+    }
+    const tagRepo = dataSource.getRepository("Tag");
+    const existing = await tagRepo.findOne({
+      where: { id: TagId },
+    });
+    if (!existing) {
+      res.status(404).json({
+        status: "failed",
+        message: "標籤不存在",
+      });
+      return;
+    }
+    await tagRepo.delete(TagId);
+    res.status(200).json({
+      status: "success",
+      message: "標籤刪除成功",
+    });
+  } catch (error) {
+    logger.warn(`[TAGS]刪除標籤失敗:${error.message}`);
+    next(error);
+  }
+};
 
 module.exports = {
   postCategory,
@@ -458,4 +493,5 @@ module.exports = {
   postPaymentMethod,
   patchProduct,
   deleteProduct,
+  deleteTag,
 };
