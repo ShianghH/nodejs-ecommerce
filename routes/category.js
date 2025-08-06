@@ -21,6 +21,6 @@ const isAdmin = require("../middlewares/isAdmin");
 const { getCategories, deleteCategories } = require("../controllers/category");
 
 router.get("/", getCategories);
-router.delete("/category_id", auth, isAdmin, deleteCategories);
+router.delete("/:category_id", auth, isAdmin, deleteCategories);
 
 module.exports = router;

@@ -73,6 +73,24 @@ const deleteCategories = async (req, res, next) => {
       });
       return;
     }
+    const productRepo = dataSource.getRepository("Product");
+    const productCount = await productRepo.count({
+      where: {
+        category: { id: categoryId },
+      },
+    });
+    if (productCount > 0) {
+      res.status(409).json({
+        status: "failed",
+        message: "該分類下仍有商品，無法刪除",
+      });
+      return;
+    }
+    await categoryRepo.softDelete(categoryId);
+    res.status(200).json({
+      status: "success",
+      message: "分類刪除成功",
+    });
   } catch (error) {
     logger.warn(`[Category] 刪除分類失敗:${error.message}`);
     next(error);
