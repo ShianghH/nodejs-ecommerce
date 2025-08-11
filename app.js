@@ -14,7 +14,8 @@ const categoryRouter = require("./routes/category");
 const ordersRouter = require("./routes/orders");
 const favoritesRouter = require("./routes/favorites");
 const cartRouter = require("./routes/cart");
-const reportRotuer = require("./routes/report");
+const tagsRouter = require("./routes/tags");
+const reportRouter = require("./routes/report");
 console.log("[Render][app] 所有 routes 載入完成");
 
 const app = express();
@@ -51,7 +52,8 @@ app.use("/api/v1/category", categoryRouter);
 app.use("/api/v1/orders", ordersRouter);
 app.use("/api/v1/favorites", favoritesRouter);
 app.use("/api/v1/cart", cartRouter);
-app.use("/api/v1/admin/report", reportRotuer);
+app.use("/api/v1/admin/tags", tagsRouter);
+app.use("/api/v1/admin/report", reportRouter);
 
 console.log("[Render][app] 所有 API route 註冊完成");
 
