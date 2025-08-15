@@ -9,6 +9,7 @@ const passwordPattern = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,32}/; // 密碼格式
 // Email 格式驗證規則：
 // 必須包含帳號@網域，帳號允許英數字 + 特定符號，網域支援 .com / .org 等結尾
 const emailPattern = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
+const maskEmail = (e) => e.replace(/(^..).+(@.*$)/, "$1***$2");
 const telReg = /^09\d{8}$/;
 
 const {
@@ -26,6 +27,8 @@ const postSignup = async (req, res, next) => {
   try {
     // 從請求主體中解構取得使用者輸入的 name、email、password 欄位
     const { name, email, password } = req.body;
+    const rawName = name; // 保留原變數以符合你現有驗證
+    const nameTrimmed = rawName.trim();
     if (
       isUndefined(name) ||
       isNotValidString(name) ||
@@ -80,7 +83,7 @@ const postSignup = async (req, res, next) => {
 
     // 建立新的使用者實例（尚未儲存到資料庫）
     const newUser = userRepository.create({
-      name,
+      name: nameTrimmed,
       email,
       password: hashPassword,
     });
@@ -92,7 +95,7 @@ const postSignup = async (req, res, next) => {
     });
 
     // 輸出日誌：記錄成功建立使用者的 ID
-    logger.info("新建立的使用者ID:", savedUser.id);
+    logger.info(`新建立的使用者ID: ${savedUser.id}`);
     res.status(201).json({
       status: "success",
       message: "註冊成功",
@@ -129,16 +132,8 @@ const postSignin = async (req, res, next) => {
       });
       return;
     }
-    //  2. 檢查密碼是否符合規則
-    if (!passwordPattern.test(password)) {
-      logger.warn("[Signin] 密碼格式錯誤：不符合強度規則");
-      res.status(400).json({
-        status: "failed",
-        message: "密碼需包含英文大小寫與數字，長度 8～32 字元",
-      });
-      return;
-    }
-    // 3. 查詢使用者是否存在,取得 users 資料表的 Repository，用來查詢或操作使用者資料
+
+    // 2. 查詢使用者是否存在,取得 users 資料表的 Repository，用來查詢或操作使用者資料
     const userRepository = dataSource.getRepository("User");
     // 查詢是否已有該 email 的使用者（只取 id、name、password 三個欄位）
     const existingUser = await userRepository.findOne({
@@ -146,7 +141,7 @@ const postSignin = async (req, res, next) => {
       select: ["id", "name", "password", "email"],
     });
     if (!existingUser) {
-      logger.warn(`[Signin] 查無此帳號：${email}`);
+      logger.warn(`[Signin] 查無此帳號：${maskEmail(email)}`);
       res.status(401).json({
         status: "failed",
         message: "使用者不存在或密碼輸入錯誤",
@@ -161,7 +156,7 @@ const postSignin = async (req, res, next) => {
     // 比對使用者輸入的明文密碼與資料庫中加密後的密碼是否一致`
     const isMach = await bcrypt.compare(password, existingUser.password);
     if (!isMach) {
-      logger.warn(`[Signin] 密碼比對失敗：${email}`);
+      logger.warn(`[Signin] 查無此帳號：${maskEmail(email)}`);
       res.status(401).json({
         status: "failed",
         message: "使用者不存在或密碼輸入錯誤",
@@ -224,13 +219,10 @@ const patchPassword = async (req, res, next) => {
       !passwordPattern.test(newPassword) ||
       !passwordPattern.test(confirmNewPassword)
     ) {
-      logger.warn(
-        "密碼不符合規則，需要包含英文數字大小寫，最短8個字，最長16個字"
-      );
+      logger.warn("密碼不符合規則，需要包含英文數字大小寫，長度 8～32 字元");
       res.status(400).json({
         status: "failed",
-        message:
-          "密碼不符合規則，需要包含英文數字大小寫，最短8個字，最長16個字",
+        message: "密碼不符合規則，需要包含英文數字大小寫，長度 8～32 字元",
       });
       return;
     }
@@ -258,7 +250,7 @@ const patchPassword = async (req, res, next) => {
     });
     const isMatch = await bcrypt.compare(password, existingUser.password);
     if (!isMatch) {
-      logger.warn(`[PATCH /users/password] 舊密碼輸入錯誤 - user: ${id}`);
+      logger.warn(`[Signin] 密碼比對失敗：${maskEmail(email)}`);
       res.status(400).json({
         status: "failed",
         message: "密碼輸入錯誤",
@@ -282,7 +274,7 @@ const patchPassword = async (req, res, next) => {
     logger.info(`[PATCH /users/password] 密碼修改成功 - user: ${id}`);
     res.status(200).json({
       status: "success",
-      message: "密碼已成功修功",
+      message: "密碼已成功修改",
     });
   } catch (error) {
     logger.error(`[PATCH /users/password] 發生錯誤：${error.message}`);
@@ -327,7 +319,11 @@ const patchProfile = async (req, res, next) => {
       }
     }
     const userRepository = dataSource.getRepository("User");
-    const updateData = await userRepository.update({ id }, { tel, address });
+    // 只更新有提供的欄位，避免把沒傳的欄位寫成 null/undefined
+    const updateFields = {};
+    if (!isUndefined(tel)) updateFields.tel = tel;
+    if (!isUndefined(address)) updateFields.address = address;
+    const updateData = await userRepository.update({ id }, updateFields);
     if (updateData.affected === 0) {
       logger.error(`[PATCH /users/profile] 資料更新失敗 - user: ${id}`);
       res.status(400).json({

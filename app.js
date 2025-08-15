@@ -66,11 +66,13 @@ app.use((err, req, res, next) => {
   req.log.error(err);
   if (err.status) {
     res.status(err.status).json({
+      status: "error",
       message: err.message,
     });
     return;
   }
   res.status(500).json({
+    status: "error",
     message: "伺服器錯誤，請稍後再試",
   });
 });
