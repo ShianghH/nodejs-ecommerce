@@ -104,6 +104,20 @@ const patchTags = async (req, res, next) => {
         return;
       }
     }
+    //進行更新
+    existing.name = name;
+    const updated = await tagRepo.save(existing);
+    res.status(200).json({
+      status: "success",
+      message: "標籤更新成功",
+      data: {
+        tag: {
+          id: updated.id,
+          name: updated.name,
+          updated: updated.updated_at,
+        },
+      },
+    });
   } catch (error) {
     logger.warn(`[Tags]編輯標籤失敗:${error.message}`);
     next(error);
