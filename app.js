@@ -28,12 +28,16 @@ console.log("[Render][app] middleware 載入中...");
 app.use(
   pinoHttp({
     logger,
-    // serializers: {
-    //   req(req) {
-    //     req.body = req.raw.body;
-    //     return req;
-    //   },
-    // },
+    redact: {
+      paths: [
+        "req.headers.authorization", // JWT 或 API Token
+        "req.body.password", // 使用者密碼
+        "req.body.newPassword", // 新密碼
+        "req.body.confirmNewPassword", // 確認密碼
+        "res.body.token", // 回應中的 JWT Token
+      ],
+      remove: true, // true 代表整個欄位移除；false 代表改成 [Redacted]
+    },
   })
 );
 console.log("[Render][app] logger middleware 載入完成");

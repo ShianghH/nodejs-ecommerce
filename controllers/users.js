@@ -18,9 +18,9 @@ const {
 } = require("../utils/validators");
 
 //從 firebase-admin 引入 FCM 通知模組，用於發送推播訊息給裝置（Web/App）
-const { messaging } = require("firebase-admin");
-const { password } = require("../config/db");
-const { startTime } = require("pino-http");
+// const { messaging } = require("firebase-admin");
+// const { password } = require("../config/db");
+// const { startTime } = require("pino-http");
 
 const postSignup = async (req, res, next) => {
   try {
@@ -154,7 +154,10 @@ const postSignin = async (req, res, next) => {
       return;
     }
     // 輸出查詢到的使用者資料（用於 debug）
-    logger.info(`使用者資料: ${JSON.stringify(existingUser)}`);
+    logger.info(
+      { user_id: existingUser.id, email: maskEmail(existingUser.email) },
+      "[Signin] 找到帳號，準備比對密碼"
+    );
     // 比對使用者輸入的明文密碼與資料庫中加密後的密碼是否一致`
     const isMach = await bcrypt.compare(password, existingUser.password);
     if (!isMach) {

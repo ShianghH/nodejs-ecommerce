@@ -1,9 +1,9 @@
 const FORBIDDEN_MESSAGE = "使用者尚未成為管理者";
-const PERMISSION_DENIED_STATUS_CODE = 401;
+const PERMISSION_DENIED_STATUS_CODE = 403;
 
 function generateError(
   status = PERMISSION_DENIED_STATUS_CODE,
-  message = FORBIDDEN_MESSAGE,
+  message = FORBIDDEN_MESSAGE
 ) {
   const error = new Error(message);
   error.status = status;
