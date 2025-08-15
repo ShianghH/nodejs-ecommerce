@@ -1,6 +1,6 @@
 const { dataSource } = require("../db/data-source");
 const logger = require("../utils/logger")("CartController");
-const config = require("../config/index");
+
 const {
   isUndefined,
   isNotValidString,
@@ -54,7 +54,7 @@ const postCart = async (req, res, next) => {
       message: "商品已加入購物車",
       data: {
         id: cartItem.id,
-        produc_variant_id: productVariantId,
+        product_variant_id: productVariantId,
         quantity,
         created_at: cartItem.created_at,
         updated_at: cartItem.updated_at,
@@ -65,7 +65,7 @@ const postCart = async (req, res, next) => {
     next(error);
   }
 };
-const deletetCart = async (req, res, next) => {
+const deleteCart = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { cartitem_id: cartItemID } = req.params;
@@ -116,5 +116,5 @@ const deletetCart = async (req, res, next) => {
 
 module.exports = {
   postCart,
-  deletetCart,
+  deleteCart,
 };

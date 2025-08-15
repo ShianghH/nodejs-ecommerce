@@ -395,7 +395,7 @@ const postApplyAdmin = async (req, res, next) => {
       message: "你現在已經是管理員啦！請小心使用權限",
     });
   } catch (error) {
-    logger.error("申請成為管理原時發生錯誤:", error);
+    logger.error("申請成為管理員時發生錯誤:", error);
     next(error);
   }
 };

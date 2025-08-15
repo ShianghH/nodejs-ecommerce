@@ -1,4 +1,3 @@
-const { messaging } = require("firebase-admin");
 const { dataSource } = require("../db/data-source");
 const logger = require("../utils/logger")("OrderController");
 
@@ -10,7 +9,6 @@ const {
   numberReg,
   telReg,
 } = require("../utils/validators");
-const PaymentMethod = require("../entities/PaymentMethod");
 
 const postOrder = async (req, res, next) => {
   try {
@@ -278,7 +276,7 @@ const getOrderDetail = async (req, res, next) => {
           id: order.id,
           order_status: order.order_status,
           shipping_name: order.shipping_name,
-          shipping_phone: order.shippingPhone,
+          shipping_phone: order.shipping_phone,
           shipping_address: order.shipping_address,
           payment: order.payment_method.name,
           subtotal: order.subtotal,
