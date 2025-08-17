@@ -60,7 +60,7 @@ const postFavorites = async (req, res, next) => {
       status: "success",
       message: "加入收藏成功",
       data: {
-        product_id: saveFavorite.product.id,
+        data: { product_id: productId },
       },
     });
   } catch (error) {

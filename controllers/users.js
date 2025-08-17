@@ -250,7 +250,6 @@ const patchPassword = async (req, res, next) => {
     });
     const isMatch = await bcrypt.compare(password, existingUser.password);
     if (!isMatch) {
-      logger.warn(`[Signin] 密碼比對失敗：${maskEmail(email)}`);
       res.status(400).json({
         status: "failed",
         message: "密碼輸入錯誤",

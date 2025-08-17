@@ -94,5 +94,11 @@ module.exports = new EntitySchema({
       nullable: false,
       onDelete: "RESTRICT",
     },
+    orderItems: {
+      target: "OrderItem",
+      type: "one-to-many",
+      inverseSide: "order",
+      cascade: true,
+    },
   },
 });

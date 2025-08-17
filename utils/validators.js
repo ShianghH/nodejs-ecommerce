@@ -1,3 +1,7 @@
+const dayjs = require("dayjs");
+const customParseFormat = require("dayjs/plugin/customParseFormat");
+dayjs.extend(customParseFormat);
+
 // 檢查傳入的值是否為 undefined（尚未被定義）
 const isUndefined = (value) => value === undefined;
 
@@ -15,20 +19,24 @@ const isNotValidInteger = (value) => {
 
 const uuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isNotValidUUID = (value) => {
-  if (typeof value !== "string") return true;
-  return !uuidRegex.test(value.trim());
-};
+
+const isNotValidUUID = (value) =>
+  typeof value !== "string" || !uuidRegex.test(value.trim());
 
 const numberReg = /^[0-9]+$/; //檢查一段字串是不是「只包含數字」
 
 const telReg = /^09\d{8}$/;
+
+const isNotValidDateYMD = (value) => {
+  return !dayjs(value, "YYYY-MM-DD", true).isValid();
+};
 
 module.exports = {
   isUndefined,
   isNotValidString,
   isNotValidInteger,
   isNotValidUUID,
+  isNotValidDateYMD,
   numberReg,
   telReg,
 };

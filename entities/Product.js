@@ -72,12 +72,13 @@ module.exports = new EntitySchema({
       target: "ProductImage",
       type: "one-to-many",
       inverseSide: "product",
+      cascade: true,
     },
     variants: {
       target: "ProductVariant",
       type: "one-to-many",
       inverseSide: "product",
-      cascade: false,
+      cascade: true,
     },
 
     productTags: {

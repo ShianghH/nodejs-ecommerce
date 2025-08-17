@@ -35,8 +35,7 @@ const postCategory = async (req, res, next) => {
       });
       return;
     }
-    const categoryRepository =
-      await dataSource.getRepository("ProductCategory");
+    const categoryRepository = dataSource.getRepository("ProductCategory");
     //檢查名稱是否重複
     const existing = await categoryRepository.findOneBy({ name });
     if (existing) {
@@ -100,13 +99,27 @@ const postProduct = async (req, res, next) => {
       });
       return;
     }
+
     //欄位可為 null，但若存在則需為數字
-    if (discountPrice != null && isNaN(Number(discountPrice))) {
-      res.status(400).json({
-        status: "failed",
-        message: "欄位格式錯誤",
-      });
-      return;
+    if (!isUndefined(discountPrice) && discountPrice !== null) {
+      if (typeof discountPrice !== "number" || isNaN(Number(discountPrice))) {
+        res.status(400).json({
+          status: "failed",
+          message: "折扣價必須為有效數字",
+        });
+        return;
+      }
+    }
+    //避免折扣價>原價
+    if (discountPrice !== null) {
+      const dp = Number(discountPrice);
+      if (dp < 0 || dp > price) {
+        res.status(400).json({
+          status: "failed",
+          message: "折扣價需小於原價且不可為負數",
+        });
+        return;
+      }
     }
     //images 陣列、內容物驗證
     if (
@@ -152,8 +165,8 @@ const postProduct = async (req, res, next) => {
       return;
     }
     // === 建立主商品 ===
-    const productRepository = await dataSource.getRepository("Product");
-    const newProduct = await productRepository.create({
+    const productRepository = dataSource.getRepository("Product");
+    const newProduct = productRepository.create({
       name,
       category: { id: categoryId },
       price,
@@ -184,6 +197,7 @@ const postProduct = async (req, res, next) => {
 
     // === 處理 Tags：若不存在就建立 ===
     const tagRepository = dataSource.getRepository("Tag");
+
     const tagEntities = [];
 
     for (const tagName of tags) {
@@ -308,10 +322,10 @@ const patchProduct = async (req, res, next) => {
     }
 
     // 更新基本欄位
-    if (name) product.name = name;
-    if (description) product.description = description;
-    if (price) product.price = price;
-    if (discount_price) product.discount_price = discount_price;
+    if (!isUndefined(name)) product.name = name;
+    if (!isUndefined(description)) product.description = description;
+    if (!isUndefined(price)) product.price = price;
+    if (!isUndefined(discount_price)) product.discount_price = discount_price;
     if (typeof is_active === "boolean") product.is_active = is_active;
 
     // 更新分類
