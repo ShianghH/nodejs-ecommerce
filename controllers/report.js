@@ -89,9 +89,31 @@ const getSalesReport = async (req, res, next) => {
     const orderRepo = dataSource.getRepository("Order");
     const orders = await orderRepo.find({
       where: {
-        created_at: Between(startISo),
+        created_at: Between(startISO, endISO),
+        status: In(["paid", "shipped", "completd"]), //訂單狀態
       },
+      relations: ["Items", "items.product", "items.product.category"],
+      order: { created_at: "ASC" },
     });
+    //KPI計算
+    let totalOrder = orders.length; //計算訂單總數
+    let totalItems = 0; //所有訂單裡的商品數量總和
+    let totalRevenue = 0; // 原價小計
+    let totalDiscount = 0; //優惠價加總
+    let itemsNet = 0; // 實收小計
+    for (const o of orders) {
+      //逐一走訪每一筆訂單o,如果 o.items 是 null or undefined，就用空陣列，避免報錯。
+      for (const it of o.items || []) {
+        const qty = Number(it.quantity) || 0;
+        const original = Number(it.original_price) || 0;
+        const unit = Number(it.unit_price) || 0;
+        totalItems += qty;
+        totalRevenue += original * qty;
+        itemsNet += unit * qty;
+        const diff = (original - unit) * qty;
+        totalDiscount += diff > 0 ? diff : 0; // // 如果是正數就加上，否則算 0
+      }
+    }
   } catch (error) {}
 };
 
