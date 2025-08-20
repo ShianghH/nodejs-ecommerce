@@ -57,7 +57,10 @@ const getSalesReport = async (req, res, next) => {
     const groupBy = ["day", "week", "month"].includes(String(group_by))
       ? String(group_by)
       : "day";
-    const tzName = isNotValidString(String(timezone));
+    const tzName = isNotValidString(String(timezone))
+      ? "Asia/Taipei"
+      : String(timezone);
+
     const includeDetails = String(include_details) === "true";
     const pageNum = Number(page) || 1;
     const limitNum = Number(limit) || 20;
@@ -76,11 +79,11 @@ const getSalesReport = async (req, res, next) => {
     }
     // 3) 時區處理
     const startISO = dayjs
-      .tz(`${start_date} 00:00:00`, tzName)
+      .tz(`${startDate} 00:00:00`, tzName)
       .utc()
       .toISOString();
     const endISO = dayjs
-      .tz(`${end_date} 00:00:00`, tzName)
+      .tz(`${endDate} 00:00:00`, tzName)
       .add(1, "day")
       .utc()
       .toISOString(); //輸出成標準的 ISO 格式字串
@@ -90,20 +93,20 @@ const getSalesReport = async (req, res, next) => {
     const orders = await orderRepo.find({
       where: {
         created_at: Between(startISO, endISO),
-        status: In(["paid", "shipped", "completd"]), //訂單狀態
+        order_status: In(["paid", "shipped", "completed"]), //訂單狀態
       },
-      relations: ["Items", "items.product", "items.product.category"],
+      relations: ["orderItems"],
       order: { created_at: "ASC" },
     });
-    //KPI計算
-    let totalOrder = orders.length; //計算訂單總數
+    // 5)KPI計算
+    const totalOrders = orders.length; //計算訂單總數
     let totalItems = 0; //所有訂單裡的商品數量總和
     let totalRevenue = 0; // 原價小計
     let totalDiscount = 0; //優惠價加總
     let itemsNet = 0; // 實收小計
     for (const o of orders) {
       //逐一走訪每一筆訂單o,如果 o.items 是 null or undefined，就用空陣列，避免報錯。
-      for (const it of o.items || []) {
+      for (const it of o.orderItems || []) {
         const qty = Number(it.quantity) || 0;
         const original = Number(it.original_price) || 0;
         const unit = Number(it.unit_price) || 0;
@@ -112,6 +115,49 @@ const getSalesReport = async (req, res, next) => {
         itemsNet += unit * qty;
         const diff = (original - unit) * qty;
         totalDiscount += diff > 0 ? diff : 0; // // 如果是正數就加上，否則算 0
+      }
+    }
+    //  6) 退款 目前無 Refund 表
+    // let refundAmount = 0; //總退款金額
+    // let refundCount = 0; //退款筆數
+    // try {
+    //   const refundRepo = dataSource.getRepository("Refund");
+    //   const refunds = await refundRepo.find({
+    //     where: {
+    //       orders: In(orders.map((o) => o.id)),
+    //     },
+    //   });
+    //   refundAmount = refunds.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    //   refundCount = refunds.length;
+    // } catch (error) {
+    //   logger.info("Refund table/repository 不存在，略過退款計算。");
+    // }
+    // // KPI：不含運費，以實收扣退款
+    // const netRevenue = itemsNet - refundAmount;
+    // const avgOrderValue =
+    //   totalOrders > 0 ? Math.round((netRevenue / totalOrders) * 100) / 100 : 0;
+
+    // 7) groups（日/週/月聚合；不分攤退款）=====
+    const bucketOf = (createdAt) => {
+      const d = dayjs(createdAt).tz(tzName);
+      //startOf("week") = 把時間設到當週的第一天,format("YYYY-MM-DD") = 輸出成「年月日」字串。
+      if (groupBy === "week") return d.startOf("week").format("YYYY-MM--DD");
+      if (groupBy === "month") return d.startOf("month").format("YYYY--MM--DD");
+      return d.format("YYYY--MM--DD"); //如果都不是（預設就是 day）
+    };
+    const groupsMap = new Map();
+    for (const o of orders) {
+      const key = bucketOf(o.created_at);
+      if (!groupsMap.has(key)) {
+        //檢查這個日期 key 在 Map 裡 有沒有存在。
+        groupsMap.set(key, {
+          data: key,
+          order: 0,
+          items: 0,
+          revenue: 0,
+          discount: 0,
+          net_revenue: 0,
+        });
       }
     }
   } catch (error) {}
