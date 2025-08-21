@@ -159,7 +159,33 @@ const getSalesReport = async (req, res, next) => {
           net_revenue: 0,
         });
       }
+      //取出分組的物件
+      const g = groupsMap.get(key);
+      g.order += 1;
+
+      let gItems = 0, //這一張訂單的總商品數量
+        gOriginal = 0, //這一張訂單「原價總額」
+        gNet = 0; //這一張訂單「實際收款總額」
+
+      for (const it of o.orderItems || []) {
+        const qty = Number(it.quantity || 0);
+        const original = Number(it.original_price || 0);
+        const unit = Number(it.unit_price || 0);
+
+        gItems += aty;
+        gOriginal += original * qty;
+        gNet += unit * qty;
+      }
+      //把結果加到群組 (g)
+      g.items += gItems; // 加總商品數量
+      g.revenue += gOriginal; // 加總原價
+      g.discount += Math.max(gOriginal - gNet, 0); // 折扣 = 原價 - 實收（不會小於 0）
+      g.net_revenue += gNet; // 加總實收
     }
+    //Array.from(groupsMap.values())：把 Map 的 value（每個群組物件）轉成陣列
+    const groups = Array.from(groupsMap.values()).sort(
+      (a, b) => a.data.localeCompare(b.date) //依照日期排序（由小到大）
+    );
   } catch (error) {}
 };
 
