@@ -30,6 +30,9 @@ const getSalesReport = async (req, res, next) => {
       limit = 20,
       sort = "created_at_desc",
     } = req.query;
+
+    logger.info("[Report] start", { startDate, endDate });
+    let details = null;
     // 2) 基本驗證
     if (
       isUndefined(startDate) ||
@@ -46,7 +49,7 @@ const getSalesReport = async (req, res, next) => {
       return;
     }
     //2.1日期區間
-    if (dayjs(startDate).isAfter(endDate)) {
+    if (dayjs(startDate).isAfter(dayjs(endDate))) {
       res.status(400).json({
         status: "failed",
         message: "start_date 不得晚於 end_date",
@@ -66,7 +69,7 @@ const getSalesReport = async (req, res, next) => {
     const limitNum = Number(limit) || 20;
     if (
       pageNum <= 0 ||
-      limit <= 0 ||
+      limitNum <= 0 ||
       isNotValidInteger(pageNum) ||
       isNotValidInteger(limitNum)
     ) {
@@ -93,7 +96,7 @@ const getSalesReport = async (req, res, next) => {
     const orders = await orderRepo.find({
       where: {
         created_at: Between(startISO, endISO),
-        order_status: In(["paid", "shipped", "completed"]), //訂單狀態
+        order_status: In(["pending", "paid", "shipped", "completed"]), //訂單狀態
       },
       relations: ["orderItems"],
       order: { created_at: "ASC" },
@@ -117,6 +120,12 @@ const getSalesReport = async (req, res, next) => {
         totalDiscount += diff > 0 ? diff : 0; // // 如果是正數就加上，否則算 0
       }
     }
+    //沒有 Refund：固定為 0，netRevenue = itemsNet
+    const refundAmount = 0;
+    const refundCount = 0;
+    const netRevenue = itemsNet;
+    const avgOrderValue =
+      totalOrders > 0 ? Math.round((netRevenue / totalOrders) * 100) / 100 : 0;
     //  6) 退款 目前無 Refund 表
     // let refundAmount = 0; //總退款金額
     // let refundCount = 0; //退款筆數
@@ -141,9 +150,9 @@ const getSalesReport = async (req, res, next) => {
     const bucketOf = (createdAt) => {
       const d = dayjs(createdAt).tz(tzName);
       //startOf("week") = 把時間設到當週的第一天,format("YYYY-MM-DD") = 輸出成「年月日」字串。
-      if (groupBy === "week") return d.startOf("week").format("YYYY-MM--DD");
-      if (groupBy === "month") return d.startOf("month").format("YYYY--MM--DD");
-      return d.format("YYYY--MM--DD"); //如果都不是（預設就是 day）
+      if (groupBy === "week") return d.startOf("week").format("YYYY-MM-DD");
+      if (groupBy === "month") return d.startOf("month").format("YYYY-MM-DD");
+      return d.format("YYYY-MM-DD"); //如果都不是（預設就是 day）
     };
     const groupsMap = new Map();
     for (const o of orders) {
@@ -151,8 +160,8 @@ const getSalesReport = async (req, res, next) => {
       if (!groupsMap.has(key)) {
         //檢查這個日期 key 在 Map 裡 有沒有存在。
         groupsMap.set(key, {
-          data: key,
-          order: 0,
+          date: key,
+          orders: 0,
           items: 0,
           revenue: 0,
           discount: 0,
@@ -161,7 +170,7 @@ const getSalesReport = async (req, res, next) => {
       }
       //取出分組的物件
       const g = groupsMap.get(key);
-      g.order += 1;
+      g.orders += 1;
 
       let gItems = 0, //這一張訂單的總商品數量
         gOriginal = 0, //這一張訂單「原價總額」
@@ -172,7 +181,7 @@ const getSalesReport = async (req, res, next) => {
         const original = Number(it.original_price || 0);
         const unit = Number(it.unit_price || 0);
 
-        gItems += aty;
+        gItems += qty;
         gOriginal += original * qty;
         gNet += unit * qty;
       }
@@ -184,9 +193,80 @@ const getSalesReport = async (req, res, next) => {
     }
     //Array.from(groupsMap.values())：把 Map 的 value（每個群組物件）轉成陣列
     const groups = Array.from(groupsMap.values()).sort(
-      (a, b) => a.data.localeCompare(b.date) //依照日期排序（由小到大）
+      (a, b) => a.date.localeCompare(b.date) //依照日期排序（由小到大）
     );
-  } catch (error) {}
+    //  8 details（可選；訂單級彙總，不含商品細項）
+    if (includeDetails) {
+      const [detailOrders, total] = await orderRepo.findAndCount({
+        where: {
+          created_at: Between(startISO, endISO),
+          order_status: In(["pending", "paid", "shipped", "completed"]),
+        },
+        relations: ["orderItems"],
+        order: {
+          created_at: sort === "created_at_asc" ? "ASC" : "DESC",
+        },
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum,
+      });
+      details = {
+        pagination: { page: pageNum, limit: limitNum, total },
+        orders: detailOrders.map((o) => {
+          let grossOriginal = 0, //訂單「原價總額」
+            grossNet = 0; //訂單實收總額
+          for (const it of o.orderItems || []) {
+            const qty = Number(it.quantity) || 0;
+            const original = Number(it.original_price) || 0;
+            const unit = Number(it.unit_price) || 0;
+            grossOriginal += original * qty;
+            grossNet += unit * qty;
+          }
+          const discount = Math.max(grossOriginal - grossNet, 0); //折扣金額
+          const shippingFee = Number(o.shipping_fee) || 0;
+          logger.info("[Report] success");
+          return {
+            order_id: o.id,
+            created_at: new Date(o.created_at).toISOString(),
+            status: o.order_status,
+            items: (o.orderItems || []).length,
+            subtotal: grossOriginal,
+            discount,
+            shipping_fee: shippingFee,
+            total: grossNet + shippingFee,
+            payment_method_id: o.payment_method_id ?? null,
+          };
+        }),
+      };
+    }
+    res.status(200).json({
+      status: "success",
+      message: "查詢成功",
+      data: {
+        range: {
+          start_date: startDate,
+          end_date: endDate,
+          group_by: groupBy,
+          timezone: tzName,
+        },
+        kpi: {
+          total_orders: totalOrders,
+          total_items: totalItems,
+          total_revenue: totalRevenue, //原價小計
+          total_discount: totalDiscount, //折扣金額
+          net_revenue: netRevenue, // 實收(不含運費)
+          avg_order_value: avgOrderValue,
+          refund_amount: refundAmount, // 固定 0
+          refund_count: refundCount, // 固定 0
+          conversion_rate: null,
+        },
+        groups,
+        details,
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "銷售摘要報表產生失敗");
+    next(error);
+  }
 };
 
 module.exports = { getSalesReport };

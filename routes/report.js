@@ -17,6 +17,6 @@ const isAdmin = require("../middlewares/isAdmin.js");
 
 const { getSalesReport } = require("../controllers/report.js");
 
-router.get("/report", auth, isAdmin, getSalesReport);
+router.get("/", auth, isAdmin, getSalesReport);
 
 module.exports = router;
