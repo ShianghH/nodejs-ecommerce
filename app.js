@@ -63,18 +63,10 @@ console.log("[Render][app] 所有 API route 註冊完成");
 
 //全域錯誤處理 middleware
 app.use((err, req, res, next) => {
+  const status = err.statusCode || err.status || 500;
+  const message = err.message || "Internal Server Error";
   req.log.error(err);
-  if (err.status) {
-    res.status(err.status).json({
-      status: "error",
-      message: err.message,
-    });
-    return;
-  }
-  res.status(500).json({
-    status: "error",
-    message: "伺服器錯誤，請稍後再試",
-  });
+  res.status(status).json({ status: "failed", message });
 });
 
 console.log("[Render][app] app.js 結尾");

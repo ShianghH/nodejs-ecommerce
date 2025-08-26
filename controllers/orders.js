@@ -19,6 +19,7 @@ const postOrder = async (req, res, next) => {
       payment_method_id: paymentMethodId,
       order_items: orderItems,
     } = req.body;
+    //1.基本驗證
     if (
       isUndefined(shippingName) ||
       isNotValidString(shippingName) ||
@@ -46,7 +47,8 @@ const postOrder = async (req, res, next) => {
           isUndefined(item.variant_id) ||
           isNotValidUUID(item.variant_id) ||
           isUndefined(item.quantity) ||
-          isNotValidInteger(item.quantity)
+          isNotValidInteger(item.quantity) ||
+          Number(item.quantity) <= 0
       )
     ) {
       res.status(400).json({
@@ -55,96 +57,118 @@ const postOrder = async (req, res, next) => {
       });
       return;
     }
-    //驗證產品ID、變體ID是否存在
-    const productRepo = await dataSource.getRepository("Product");
-    const variantRepo = dataSource.getRepository("ProductVariant");
-
-    const orderItemData = [];
-
-    for (const it of orderItems) {
-      // 先確認 product 存在
-      const product = await productRepo.findOne({
-        where: { id: it.product_id },
-        select: ["id", "price", "discount_price"],
-      });
-      if (!product) {
-        logger.warn(`[Product] 無此產品ID ${it.product_id}`);
-        res.status(404).json({
-          status: "failed",
-          message: "找不到商品",
-        });
-        return;
-      }
-
-      // 查 variant並確定隸屬於剛剛那個 product
-      const variant = await variantRepo.findOne({
-        where: { id: it.variant_id, product: { id: it.product_id } }, // 🔸 雙條件
-        relations: { product: true },
-      });
-      if (!variant) {
-        logger.warn(`[Variant] 商品規錯誤 ${it.variant_id}`);
-        res.status(404).json({
-          status: "failed",
-          message: "商品規格錯誤",
-        });
-        return;
-      }
-
-      //  計算金額
-      const original = Number(product.price);
-      const unit = Number(product.discount_price ?? original);
-      orderItemData.push({
-        variant_id: it.variant_id,
-        quantity: it.quantity,
-        original_price: original,
-        unit_price: unit,
-        subtotal: unit * it.quantity,
-      });
-    }
-    const totalBefore = orderItemData.reduce(
-      (sum, i) => sum + i.original_price * i.quantity,
-      0
-    );
-    const totalAfter = orderItemData.reduce((sum, i) => sum + i.subtotal, 0);
-    const discountAmt = totalBefore - totalAfter;
-
-    /* 3. 建立主訂單 ---------------------------------------------------- */
     const { id: userId } = req.user;
-    const orderRepository = dataSource.getRepository("Order");
-    const orderItemsRepository = dataSource.getRepository("OrderItem");
 
-    const newOrder = await orderRepository.save(
-      orderRepository.create({
-        user: { id: userId },
-        order_status: "pending",
-        shipping_name: shippingName,
-        shipping_phone: shippingPhone,
-        shipping_address: shippingAddress,
-        payment_method: { id: paymentMethodId },
-        total_before_discount: totalBefore,
-        discount_amount: discountAmt,
-        subtotal: totalAfter,
-      })
-    );
+    //2 開始交易：所有動作要嘛全成功，要嘛全失敗
+    const result = await dataSource.transaction(async (manager) => {
+      const productRepo = manager.getRepository("Product");
+      const variantRepo = manager.getRepository("ProductVariant");
+      const orderRepository = manager.getRepository("Order");
+      const orderItemsRepository = manager.getRepository("OrderItem");
+      const paymentRepo = manager.getRepository("PaymentMethod");
 
-    /* 4. 建立 order_items ---------------------------------------------- */
-    await orderItemsRepository.insert(
-      orderItemData.map((i) => ({
-        order: { id: newOrder.id },
-        product_variant: { id: i.variant_id },
-        quantity: i.quantity,
-        original_price: i.original_price,
-        unit_price: i.unit_price,
-        subtotal: i.subtotal,
-      }))
-    );
+      //2-1.付款方式存在檢查（避免外鍵失敗）
+      const pm = await paymentRepo.findOne({ where: { id: paymentMethodId } });
+      if (!pm) {
+        const err = new Error("付款方式不存在");
+        err.statusCode = 404;
+        throw err;
+      }
+      //2-2. 逐項驗證商品/規格，計算金額（先不扣庫存）
+      const orderItemData = [];
+      for (const it of orderItems) {
+        const product = await productRepo.findOne({
+          where: { id: it.product_id },
+          select: ["id", "price", "discount_price"],
+        });
+        if (!product) {
+          const err = new Error("找不到商品");
+          err.statusCode = 404;
+          throw err;
+        }
 
-    /* 5. 回傳成功 ------------------------------------------------------ */
+        // 用悲觀鎖鎖住該 variant，避免並發超賣
+        const variant = await variantRepo.findOne({
+          where: {
+            id: it.variant_id,
+            product: {
+              id: it.product_id,
+            },
+          },
+          relations: { product: true },
+          lock: { mode: "pessimistic_write" }, //鎖這筆庫存列
+        });
+        if (!variant) {
+          const err = new Error("商品規錯誤");
+          err.statusCode = 404;
+          throw err;
+        }
+        const original = Number(product.price);
+        const unit = Number(product.discount_price ?? original);
+        orderItemData.push({
+          variant_id: it.variant_id,
+          quantity: it.quantity,
+          original_price: original,
+          unit_price: unit,
+          subtotal: unit * it.quantity,
+        });
+      }
+      const totalBefore = orderItemData.reduce(
+        (sum, i) => sum + i.original_price * i.quantity,
+        0
+      );
+      const totalAfter = orderItemData.reduce((sum, i) => sum + i.subtotal, 0);
+      const discountAmt = totalBefore - totalAfter;
+      // 2-3. 建立主訂單
+      const newOrder = await orderRepository.save(
+        orderRepository.create({
+          user: { id: userId },
+          order_status: "pending",
+          shipping_name: shippingName,
+          shipping_phone: shippingPhone,
+          shipping_address: shippingAddress,
+          payment_method: { id: paymentMethodId },
+          total_before_discount: totalBefore,
+          discount_amount: discountAmt,
+          subtotal: totalAfter,
+        })
+      );
+      //2-4 建立 order_items
+      await orderItemsRepository.insert(
+        orderItemData.map((i) => ({
+          order: { id: newOrder.id },
+          product_variant: { id: i.variant_id },
+          quantity: i.quantity,
+          original_price: i.original_price,
+          unit_price: i.unit_price,
+          subtotal: i.subtotal,
+        }))
+      );
+      // 2-5) 逐筆扣庫存（條件更新：stock >= qty，否則視為不足）
+      orderItemData.sort((a, b) => a.variant_id.localeCompare(b.variant_id));
+      for (const i of orderItemData) {
+        const updateRes = await manager
+          .createQueryBuilder()
+          .update("ProductVariant")
+          .set({ stock: () => `stock - ${i.quantity}` })
+          .where("id = :id", { id: i.variant_id })
+          .andWhere("stock >= :qty", { qty: i.quantity })
+          .execute();
+        if (updateRes.affected !== 1) {
+          const err = new Error("庫存不足");
+          err.statusCode = 409;
+          throw err;
+        }
+      }
+      return newOrder;
+    });
+
+    // 3 成功提交
     logger.info(`[Order] 使用者 ${userId} 成功建立訂單`);
     return res.status(201).json({
       status: "success",
       message: "訂單建立成功",
-      data: { order_id: newOrder.id },
+      data: { order_id: result.id },
     });
   } catch (error) {
     logger.error(`[Orders]建立訂單失敗 `);
