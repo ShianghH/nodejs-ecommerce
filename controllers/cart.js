@@ -68,7 +68,7 @@ const postCart = async (req, res, next) => {
 const deleteCart = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const { cartitem_id: cartItemID } = req.params;
+    const { cartItem_id: cartItemID } = req.params;
     if (
       isUndefined(cartItemID) ||
       isNotValidString(cartItemID) ||
@@ -113,8 +113,10 @@ const deleteCart = async (req, res, next) => {
     next(error);
   }
 };
+const getCart = async (req, res, next) => {};
 
 module.exports = {
   postCart,
   deleteCart,
+  getCart,
 };
