@@ -113,7 +113,25 @@ const deleteCart = async (req, res, next) => {
     next(error);
   }
 };
-const getCart = async (req, res, next) => {};
+const getCart = async (req, res, next) => {
+  try {
+    const { cartItem_id: cartItemID } = req.params;
+    if (
+      isNotValidUUID(cartItemID) ||
+      isUndefined(cartItemID) ||
+      isNotValidString(cartItemID)
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤",
+      });
+      return;
+    }
+  } catch (error) {
+    logger.warn();
+    next(error);
+  }
+};
 
 module.exports = {
   postCart,
