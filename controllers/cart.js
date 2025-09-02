@@ -1,4 +1,7 @@
 const { dataSource } = require("../db/data-source");
+const Order = require("../entities/Order");
+const Product = require("../entities/Product");
+const { param } = require("../routes/cart");
 const logger = require("../utils/logger")("CartController");
 
 const {
@@ -68,7 +71,7 @@ const postCart = async (req, res, next) => {
 const deleteCart = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const { cartItem_id: cartItemID } = req.params;
+    const { cart_item_id: cartItemID } = req.params;
     if (
       isUndefined(cartItemID) ||
       isNotValidString(cartItemID) ||
@@ -115,18 +118,68 @@ const deleteCart = async (req, res, next) => {
 };
 const getCart = async (req, res, next) => {
   try {
-    const { cartItem_id: cartItemID } = req.params;
+    const userId = req.user.id;
+    const { page = 1 } = req.query;
+    const pageToInt = parseInt(page, 10);
+    const perPage = 10;
+    const skip = (pageToInt - 1) * perPage;
+
     if (
-      isNotValidUUID(cartItemID) ||
-      isUndefined(cartItemID) ||
-      isNotValidString(cartItemID)
+      !numberReg.test(page) ||
+      isNaN(pageToInt) ||
+      pageToInt < 1 ||
+      pageToInt % 1 !== 0
     ) {
       res.status(400).json({
         status: "failed",
-        message: "欄位格式錯誤",
+        message: "請輸入有效的頁數",
       });
       return;
     }
+    //1 撈資料
+    const cartItemRepo = dataSource.getRepository("CartItem");
+    const [row, total] = await cartItemRepo.findAndCount({
+      where: {
+        user: { id: userId },
+      },
+      relations: { productVariant: { product: true } },
+      order: { created_at: "DESC" },
+      skip,
+      take: perPage,
+    });
+    //2. 整理回傳
+    let totalQuantity = 0;
+    let totalAmount = 0;
+    const items = row.map((r) => {
+      const variant = r.productVariant || null;
+      const product = r.product || null;
+      const price = Number(product?.price ?? 0);
+      const discountPrice =
+        product?.discount_price !== null
+          ? Number(product.discount_price)
+          : null;
+      const unit = discountPrice !== null ? discountPrice : price;
+      const qty = Number(r.quantity ?? 0);
+      const subtotal = unit * qty;
+
+      totalQuantity += qty;
+      totalAmount += subtotal;
+
+      return {
+        cart_item_id: r.id,
+        product_id: product?.id ?? null,
+        variant_id: variant?.id ?? null,
+        product_name: product?.name ?? null,
+        option_name: variant?.option_name ?? null,
+        option_value: variant?.value ?? null,
+        price,
+        discount_price: discountPrice,
+        quantity: qty,
+        subtotal,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+      };
+    });
   } catch (error) {
     logger.warn();
     next(error);
