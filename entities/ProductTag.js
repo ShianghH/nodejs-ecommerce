@@ -31,14 +31,19 @@ module.exports = new EntitySchema({
     product: {
       type: "many-to-one",
       target: "Product",
-      joinColumn: { name: "product_id" },
+      joinColumn: { name: "product_id", referencedColumnName: "id" },
       onDelete: "CASCADE",
     },
     tag: {
       type: "many-to-one",
       target: "Tag",
-      joinColumn: { name: "tag_id" },
+      joinColumn: { name: "tag_id", referencedColumnName: "id" },
       onDelete: "CASCADE",
     },
   },
+  uniques: [
+    {
+      columns: ["product", "tag"],
+    },
+  ],
 });

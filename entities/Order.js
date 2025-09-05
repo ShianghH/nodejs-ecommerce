@@ -81,7 +81,8 @@ module.exports = new EntitySchema({
         foreignKeyConstraintName: "fk_orders_user",
       },
       cascade: false,
-      onDelete: "CASCADE",
+      nullable: false,
+      onDelete: "RESTRICT",
     },
     payment_method: {
       target: "PaymentMethod",

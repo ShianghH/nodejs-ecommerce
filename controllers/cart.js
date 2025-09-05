@@ -152,12 +152,10 @@ const getCart = async (req, res, next) => {
     let totalAmount = 0;
     const items = row.map((r) => {
       const variant = r.productVariant || null;
-      const product = r.product || null;
+      const product = variant?.product || null;
       const price = Number(product?.price ?? 0);
       const discountPrice =
-        product?.discount_price !== null
-          ? Number(product.discount_price)
-          : null;
+        product?.discount_price == null ? null : Number(product.discount_price);
       const unit = discountPrice !== null ? discountPrice : price;
       const qty = Number(r.quantity ?? 0);
       const subtotal = unit * qty;
@@ -179,6 +177,23 @@ const getCart = async (req, res, next) => {
         created_at: r.created_at,
         updated_at: r.updated_at,
       };
+    });
+    //3. 回傳結果
+    res.status(200).json({
+      status: "suceess",
+      message: "查詢購物車成功",
+      data: {
+        items,
+        meta: {
+          page: pageToInt,
+          limit: perPage,
+          total,
+          kpi: {
+            total_quantity: totalQuantity,
+            total_amount: totalAmount,
+          },
+        },
+      },
     });
   } catch (error) {
     logger.warn();

@@ -20,6 +20,6 @@ const { postCart, deleteCart, getCart } = require("../controllers/cart");
 
 router.post("/items", auth, postCart);
 router.delete("/:cart_item_id", auth, deleteCart);
-router.get("/:cart_item_id", auth, getCart);
+router.get("/", auth, getCart);
 
 module.exports = router;

@@ -66,7 +66,8 @@ module.exports = new EntitySchema({
         foreignKeyConstraintName: "fk_products_category",
       },
       cascade: false,
-      onDelete: "CASCADE",
+      nullable: true,
+      onDelete: "SET NULL",
     },
     images: {
       target: "ProductImage",
