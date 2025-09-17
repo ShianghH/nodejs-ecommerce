@@ -1,7 +1,4 @@
 const { dataSource } = require("../db/data-source");
-const Order = require("../entities/Order");
-const Product = require("../entities/Product");
-const { param } = require("../routes/cart");
 const logger = require("../utils/logger")("CartController");
 
 const {
@@ -19,10 +16,7 @@ const postCart = async (req, res, next) => {
     if (
       isUndefined(productVariantId) ||
       isNotValidString(productVariantId) ||
-      isNotValidUUID(productVariantId) ||
-      isUndefined(quantity) ||
-      isNotValidInteger(quantity) ||
-      quantity <= 0
+      isNotValidUUID(productVariantId)
     ) {
       res.status(400).json({
         status: "failed",
@@ -30,6 +24,20 @@ const postCart = async (req, res, next) => {
       });
       return;
     }
+    const qtyNum = Number(quantity);
+    if (
+      isUndefined(quantity) ||
+      !Number.isFinite(qtyNum) ||
+      !Number.isInteger(qtyNum) ||
+      qtyNum <= 0
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤：quantity 必須為正整數",
+      });
+      return;
+    }
+
     const cartRepo = dataSource.getRepository("CartItem");
     const existingItem = await cartRepo.findOne({
       where: {
@@ -37,19 +45,18 @@ const postCart = async (req, res, next) => {
         productVariant: { id: productVariantId },
       },
       relations: {
-        user: true,
         productVariant: true,
       },
     });
     let cartItem;
     if (existingItem) {
-      existingItem.quantity += quantity;
+      existingItem.quantity += qtyNum;
       cartItem = await cartRepo.save(existingItem);
     } else {
       cartItem = await cartRepo.save({
         user: { id: userId },
         productVariant: { id: productVariantId },
-        quantity,
+        quantity: qtyNum,
       });
     }
     res.status(200).json({
@@ -113,6 +120,129 @@ const deleteCart = async (req, res, next) => {
     });
   } catch (error) {
     logger.warn(`[Cart]刪除購物車商品失敗:${error.message}`);
+    next(error);
+  }
+};
+const patchCart = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { cart_item_id: cartItemID } = req.params;
+    const { quantity } = req.body;
+    //基本驗證
+    if (
+      isUndefined(cartItemID) ||
+      isNotValidUUID(cartItemID) ||
+      isNotValidString(cartItemID)
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤：cart_item_id",
+      });
+      return;
+    }
+    // quantity 檢查（允許 "3" 這種字串數字；不使用 isNotValidInteger 以保留負數→刪除）
+    if (isUndefined(quantity)) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤: quantity 必填",
+      });
+      return;
+    }
+    // 允許字串數字，例如 "3"
+    const qty = Number(quantity);
+    if (!Number.isFinite(qty) || !Number.isInteger(qty)) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤:quantity 必須是整數",
+      });
+      return;
+    }
+    // --- 取得 CartItem 並驗證歸屬 ---
+    const cartItemRepo = dataSource.getRepository("CartItem");
+    const cartItem = await cartItemRepo.findOne({
+      where: {
+        id: cartItemID,
+        user: { id: userId },
+      },
+      relations: {
+        user: true,
+        productVariant: { product: true },
+      },
+    });
+    if (!cartItem) {
+      res.status(404).json({
+        status: "failed",
+        message: "購物車不存在或不屬於此使用者",
+      });
+      return;
+    }
+    // --- qty <= 0 視同刪除 ---
+    if (qty <= 0) {
+      await cartItemRepo.remove(cartItem);
+      logger.info("[CartItem]removed", { cartItemID, userId });
+      res.status(200).json({
+        status: "success",
+        message: "購物車項目已刪除",
+        data: { cart_item_id: cartItemID },
+      });
+      return;
+    }
+    // --- 庫存檢查（以 ProductVariant.stock 為準） ---
+    const variantRepo = dataSource.getRepository("ProductVariant");
+    const variant = await variantRepo.findOne({
+      where: {
+        id: cartItem.productVariant.id,
+      },
+      select: ["id", "stock"],
+    });
+    if (!variant) {
+      res.status(409).json({
+        status: "failed",
+        message: "商品規格不存在",
+      });
+      return;
+    }
+    if (qty > variant.stock) {
+      res.status(409).json({
+        status: "failed",
+        message: "庫存不足，請重新調整",
+        data: {
+          stock: variant.stock,
+        },
+      });
+      return;
+    }
+    // --- 更新數量 ---
+    cartItem.quantity = qty;
+    await cartItemRepo.save(cartItem);
+
+    const unitPrice = cartItem.productVariant.product?.price ?? null;
+    const subtotal = unitPrice !== null ? unitPrice * qty : null;
+
+    logger.info(`[CartItem]:updated`, { cartItemID, userId, quantity: qty });
+
+    res.status(200).json({
+      status: "success",
+      message: "已更新購物車數量",
+      data: {
+        cartItem: {
+          id: cartItem.id,
+          quantity: cartItem.quantity,
+          variant_id: cartItem.productVariant.id,
+          product: {
+            id: cartItem.productVariant.product?.id ?? null,
+            name: cartItem.productVariant.product?.name ?? null,
+          },
+          unit_price: unitPrice,
+          discount_price:
+            cartItem.productVariant.product?.discount_price ?? null,
+          subtotal,
+          updated_at: cartItem.updated_at,
+        },
+      },
+    });
+  } catch (error) {
+    logger.warn(`[PATCH]: 刪除購物車失敗`);
     next(error);
   }
 };
@@ -205,4 +335,5 @@ module.exports = {
   postCart,
   deleteCart,
   getCart,
+  patchCart,
 };
