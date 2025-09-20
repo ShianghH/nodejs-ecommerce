@@ -129,11 +129,7 @@ const patchCart = async (req, res, next) => {
     const { cart_item_id: cartItemID } = req.params;
     const { quantity } = req.body;
     //基本驗證
-    if (
-      isUndefined(cartItemID) ||
-      isNotValidUUID(cartItemID) ||
-      isNotValidString(cartItemID)
-    ) {
+    if (isUndefined(cartItemID) || isNotValidUUID(cartItemID)) {
       res.status(400).json({
         status: "failed",
         message: "欄位格式錯誤：cart_item_id",
@@ -176,6 +172,42 @@ const patchCart = async (req, res, next) => {
       });
       return;
     }
+    // --- 若數量相同，直接回已更新（省一次 I/O）---
+    if (qty === cartItem.quantity) {
+      const product = cartItem.productVariant.product;
+
+      // 轉成 number
+      const price = Number(product?.price);
+      const discount = Number(product?.discount_price);
+
+      // 有折扣價(>0) 才算有效折扣
+      const hasDiscount = Number.isFinite(discount) && discount > 0;
+      // 回傳：unit_price = 原價；discount_price 僅在有效時帶值
+      const unitPrice = Number.isFinite(price) ? price : null; // 原價
+      const usedPrice = hasDiscount ? discount : unitPrice; // 小計採用價
+      const subtotal = usedPrice != null ? usedPrice * qty : null;
+      res.status(200).json({
+        status: "success",
+        message: "購物車數量無變更",
+        data: {
+          cart_item: {
+            id: cartItem.id,
+            quantity: cartItem.quantity,
+            variant_id: cartItem.productVariant.id,
+            product: {
+              id: product?.id ?? null,
+              name: product?.name ?? null,
+            },
+            unit_price: unitPrice,
+            discount_price: product?.discount_price ?? null,
+            subtotal,
+            updated_at: cartItem.updated_at,
+          },
+        },
+      });
+      return;
+    }
+
     // --- qty <= 0 視同刪除 ---
     if (qty <= 0) {
       await cartItemRepo.remove(cartItem);
@@ -216,8 +248,18 @@ const patchCart = async (req, res, next) => {
     cartItem.quantity = qty;
     await cartItemRepo.save(cartItem);
 
-    const unitPrice = cartItem.productVariant.product?.price ?? null;
-    const subtotal = unitPrice !== null ? unitPrice * qty : null;
+    const product = cartItem.productVariant.product;
+
+    // 轉成 number
+    const price = Number(product?.price);
+    const discount = Number(product?.discount_price);
+
+    // 有折扣價(>0) 才算有效折扣
+    const hasDiscount = Number.isFinite(discount) && discount > 0;
+    // 回傳：unit_price = 原價；discount_price 僅在有效時帶值
+    const unitPrice = Number.isFinite(price) ? price : null; // 原價
+    const usedPrice = hasDiscount ? discount : unitPrice; // 小計採用價
+    const subtotal = usedPrice != null ? usedPrice * qty : null;
 
     logger.info(`[CartItem]:updated`, { cartItemID, userId, quantity: qty });
 
@@ -230,19 +272,18 @@ const patchCart = async (req, res, next) => {
           quantity: cartItem.quantity,
           variant_id: cartItem.productVariant.id,
           product: {
-            id: cartItem.productVariant.product?.id ?? null,
-            name: cartItem.productVariant.product?.name ?? null,
+            id: product?.id ?? null,
+            name: product?.name ?? null,
           },
           unit_price: unitPrice,
-          discount_price:
-            cartItem.productVariant.product?.discount_price ?? null,
+          discount_price: product?.discount_price ?? null,
           subtotal,
           updated_at: cartItem.updated_at,
         },
       },
     });
   } catch (error) {
-    logger.warn(`[PATCH]: 刪除購物車失敗`);
+    logger.warn(`[PATCH]: 更新購物車失敗`);
     next(error);
   }
 };
@@ -310,7 +351,7 @@ const getCart = async (req, res, next) => {
     });
     //3. 回傳結果
     res.status(200).json({
-      status: "suceess",
+      status: "success",
       message: "查詢購物車成功",
       data: {
         items,
