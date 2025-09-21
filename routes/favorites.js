@@ -18,8 +18,10 @@ const auth = require("../middlewares/auth.js")({
 const {
   postFavorites,
   deleteFavorites,
+  getFavorites,
 } = require("../controllers/favorites.js");
 
+router.get("/", auth, getFavorites);
 router.post("/", auth, postFavorites);
 router.delete("/:product_id", auth, deleteFavorites);
 

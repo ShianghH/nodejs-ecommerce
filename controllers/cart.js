@@ -1,5 +1,6 @@
 const { dataSource } = require("../db/data-source");
 const logger = require("../utils/logger")("CartController");
+const { IsNull } = require("typeorm");
 
 const {
   isUndefined,
@@ -36,6 +37,36 @@ const postCart = async (req, res, next) => {
         message: "欄位格式錯誤：quantity 必須為正整數",
       });
       return;
+    }
+    // --- 讀取 Variant + 關聯 Product，且過濾「已下架/已軟刪除」 ---
+    const variantRepo = dataSource.getRepository("ProductVariant");
+    const variant = await variantRepo.findOne({
+      where: {
+        id: productVariantId,
+        product: {
+          deleted_at: IsNull(),
+        },
+      },
+      relations: {
+        product: true,
+      },
+      select: ["id", "stock"],
+    });
+    if (!variant) {
+      res.status(400).json({
+        status: "failed",
+        message: "商品不存在或是已下架",
+      });
+      return;
+    }
+
+    // --- 庫存檢查 ---
+    if (qtyNum > variant.stock) {
+      return res.status(409).json({
+        status: "failed",
+        message: "庫存不足",
+        data: { stock: variant.stock },
+      });
     }
 
     const cartRepo = dataSource.getRepository("CartItem");
@@ -129,6 +160,13 @@ const patchCart = async (req, res, next) => {
     const { cart_item_id: cartItemID } = req.params;
     const { quantity } = req.body;
     //基本驗證
+    if (!userId) {
+      res.status(400).json({
+        status: "failed",
+        message: "使用者不存在",
+      });
+      return;
+    }
     if (isUndefined(cartItemID) || isNotValidUUID(cartItemID)) {
       res.status(400).json({
         status: "failed",

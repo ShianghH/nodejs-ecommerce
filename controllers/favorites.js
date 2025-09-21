@@ -108,7 +108,42 @@ const deleteFavorites = async (req, res, next) => {
   }
 };
 
+const getFavorites = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const favoriteRepo = dataSource.getRepository("FavoriteItem");
+    const favorites = await favoriteRepo.find({
+      where: {
+        user: { id: userId },
+      },
+      relations: {
+        product: true,
+      },
+      order: { created_at: "DESC" },
+    });
+    const result = favorites.map((f) => {
+      const product = f.product;
+      return {
+        id: f.id,
+        product_id: f.product?.id,
+        created_at: f.created_at,
+      };
+    });
+    res.status(200).json({
+      status: "success",
+      message: "查詢成功",
+      data: {
+        favorites: result,
+      },
+    });
+  } catch (error) {
+    logger.warn(`[Favorites]:查詢收藏商品失敗`);
+    next(error);
+  }
+};
+
 module.exports = {
   postFavorites,
   deleteFavorites,
+  getFavorites,
 };
