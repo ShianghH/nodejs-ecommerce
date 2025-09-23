@@ -60,7 +60,7 @@ app.use("/api/v1/favorites", favoritesRouter);
 app.use("/api/v1/cart", cartRouter);
 app.use("/api/v1/admin/tags", tagsRouter);
 app.use("/api/v1/admin/report", reportRouter);
-app.use("/api/v1/paymentMethods", paymentmethodsRouter);
+app.use("/api/v1/payment_methods", paymentmethodsRouter);
 
 console.log("[Render][app] 所有 API route 註冊完成");
 

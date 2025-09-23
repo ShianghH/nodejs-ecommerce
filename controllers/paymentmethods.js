@@ -11,6 +11,17 @@ const {
 
 const getPaymentMethods = async (req, res, next) => {
   try {
+    const paymentRepo = dataSource.getRepository("PaymentMethod");
+    const payment = await paymentRepo.find({
+      select: ["id", "name"],
+    });
+    res.status(200).json({
+      status: "success",
+      message: "查詢成功",
+      data: {
+        payment,
+      },
+    });
   } catch (error) {
     logger.warn(`[PaymentMethods]取得付款方式失敗:${error.message}`);
     next(error);
