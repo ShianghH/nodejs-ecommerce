@@ -1,3 +1,4 @@
+const { ILike } = require("typeorm");
 const { dataSource } = require("../db/data-source");
 const logger = require("../utils/logger")("ProductsController");
 
@@ -11,7 +12,15 @@ const {
 
 const getProducts = async (req, res, next) => {
   try {
-    const { page = 1, category = "" } = req.query;
+    const {
+      page = 1,
+      category = "",
+      category_id: categoryId = "",
+      keyword = "",
+      min_price: minPrice = "",
+      max_price: maxPrice = "",
+      sort = "created_at_desc",
+    } = req.query;
 
     const pageToInt = parseInt(page, 10);
     const perPage = 10;
@@ -29,91 +38,163 @@ const getProducts = async (req, res, next) => {
         message: "請輸入有效的頁數",
       });
     }
-
-    logger.debug(`category: ${category}`);
-
-    // 先找分類（如果有傳）
-    let categoryCondition = {};
-    if (category !== "") {
-      const categoryEntity = await dataSource
-        .getRepository("ProductCategory")
-        .findOne({
-          select: ["id", "name"],
-          where: { name: category },
-        });
-
-      if (!categoryEntity) {
-        logger.warn(`[Products] 找不到該分類: ${category}`);
-        return res.status(404).json({
-          status: "failed",
-          message: "找不到該分類",
-        });
-      }
-
-      categoryCondition.category = { id: categoryEntity.id };
+    if (typeof category !== "string" || typeof keyword !== "string") {
+      return res
+        .status(400)
+        .json({ status: "failed", message: "查詢參數格式錯誤" });
     }
 
-    // 組查詢條件
-    const productWhereOptions = {
-      is_active: true,
-      ...categoryCondition,
+    const priceMin = minPrice === "" ? null : Number(minPrice);
+    const priceMax = maxPrice === "" ? null : Number(maxPrice);
+    if (
+      (priceMin !== null && (!Number.isFinite(priceMin) || priceMin < 0)) ||
+      (priceMax !== null && (!Number.isFinite(priceMax) || priceMax < 0)) ||
+      (priceMin !== null && priceMax !== null && priceMin > priceMax)
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "價格區間不正確",
+      });
+      return;
+    }
+    // 排序白名單
+    const sortKey = String(sort || "")
+      .trim()
+      .toLowerCase();
+    const sortMap = {
+      created_at_desc: (qb) => qb.addOrderBy("p.created_at", "DESC"),
+
+      price_asc: (qb) =>
+        qb
+          // 先選出一個「實際售價」欄位別名
+          .addSelect("COALESCE(p.discount_price, p.price)", "effective_price")
+          // 再用這個別名排序
+          .addOrderBy("effective_price", "ASC")
+          // 備援排序，價格相同時用上架時間
+          .addOrderBy("p.created_at", "DESC"),
+
+      price_desc: (qb) =>
+        qb
+          .addSelect("COALESCE(p.discount_price, p.price)", "effective_price")
+          .addOrderBy("effective_price", "DESC")
+          .addOrderBy("p.created_at", "DESC"),
     };
 
-    // 查商品 + 類別（JOIN）
-    const [products, total] = await dataSource
+    const sortFn = sortMap[sortKey] || sortMap.created_at_desc;
+
+    // 組 QueryBuilder
+    const baseQB = dataSource
       .getRepository("Product")
-      .findAndCount({
-        where: productWhereOptions,
-        relations: {
-          category: true, // 關聯 Category
-          images: true,
-        },
-        select: {
-          id: true,
-          name: true,
-          price: true,
-          discount_price: true,
-          created_at: true,
-          category: {
-            id: true,
-            name: true,
-          },
-        },
-        skip,
-        take: perPage,
-        order: {
-          created_at: "DESC",
+      .createQueryBuilder("p")
+      .leftJoinAndSelect("p.category", "c")
+      .where("p.is_active = :active", { active: true });
+
+    // 類別過濾（名稱或 ID）
+    if (category.trim() !== "") {
+      baseQB.andWhere("c.name = :categoryName", {
+        categoryName: category.trim(),
+      });
+    }
+    if (categoryId.trim() !== "") {
+      baseQB.andWhere("c.id = :categoryId", { categoryId: categoryId.trim() });
+    }
+
+    // 關鍵字（name/description 模糊）
+    if (keyword.trim() !== "") {
+      baseQB.andWhere("(p.name ILIKE :kw OR p.description ILIKE :kw)", {
+        kw: `%${keyword.trim()}%`,
+      });
+    }
+
+    // 價格區間（以實際售價：優先折扣價，否則原價）
+    if (priceMin !== null) {
+      baseQB.andWhere("COALESCE(p.discount_price, p.price) >= :min", {
+        min: priceMin,
+      });
+    }
+    if (priceMax !== null) {
+      baseQB.andWhere("COALESCE(p.discount_price, p.price) <= :max", {
+        max: priceMax,
+      });
+    }
+
+    // total：同條件、不要下 orderBy
+    const total = await baseQB.clone().getCount();
+    // 當頁資料：排序 + 分頁（不 join images）
+    const rowsQB = baseQB
+      .clone()
+      .select([
+        "p.id",
+        "p.name",
+        "p.price",
+        "p.discount_price",
+        "p.created_at",
+        "c.id",
+        "c.name",
+      ]);
+
+    rowsQB.orderBy();
+    sortFn(rowsQB);
+    // 分頁
+    rowsQB.skip(skip).take(perPage);
+    const rows = await rowsQB.getMany();
+
+    const ids = rows.map((r) => r.id);
+    if (ids.length === 0) {
+      return res.status(200).json({
+        status: "success",
+        message: "查詢成功",
+        data: {
+          products: [],
+          pagination: { page: pageToInt, limit: perPage, total },
         },
       });
+    }
 
-    // 整理回傳格式
-    const formatted = products.map((p) => {
-      // 從 images 陣列中找出主圖（is_main 為 true）
-      const mainImage = p.images?.find((img) => img.is_main);
+    // ─────────────────────────────────────────────────────────
+    // 第二段：批量撈主圖（主圖優先，其次 sort_order）
 
-      return {
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        discount_price: p.discount_price,
-        main_image: mainImage?.image_url || null,
-        category: {
-          id: p.category?.id,
-          name: p.category?.name,
-        },
-      };
-    });
+    const imgRows = await dataSource
+      .getRepository("ProductImage")
+      .createQueryBuilder("img")
+      .where("img.product_id IN (:...ids)", { ids })
+      .orderBy("img.is_main", "DESC")
+      .addOrderBy("img.sort_order", "ASC")
+      .addOrderBy("img.id", "ASC") // 兜底，確保穩定
+      .select([
+        "img.product_id",
+        "img.image_url",
+        "img.is_main",
+        "img.sort_order",
+      ])
+      .getMany();
+
+    // 建主圖 map（每個 product 只留第一張）
+    const mainImageMap = new Map(); // product_id -> image_url
+    for (const img of imgRows) {
+      if (!mainImageMap.has(img.product_id)) {
+        mainImageMap.set(img.product_id, img.image_url);
+      }
+    }
+
+    // 整形回傳（格式與你原本一致）
+    const products = rows.map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      discount_price: p.discount_price,
+      main_image: mainImageMap.get(p.id) || null,
+      category: p.category
+        ? { id: p.category.id, name: p.category.name }
+        : null,
+    }));
 
     return res.status(200).json({
       status: "success",
       message: "查詢成功",
       data: {
-        products: formatted,
-        pagination: {
-          page: pageToInt,
-          limit: perPage,
-          total,
-        },
+        products,
+        pagination: { page: pageToInt, limit: perPage, total },
       },
     });
   } catch (error) {
