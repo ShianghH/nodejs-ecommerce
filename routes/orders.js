@@ -19,10 +19,12 @@ const {
   postOrder,
   getOrder,
   getOrderDetail,
+  cancelOrder,
 } = require("../controllers/orders.js");
 
 router.post("/", auth, postOrder);
 router.get("/", auth, getOrder);
 router.get("/:order_id", auth, getOrderDetail);
+router.post("/:order_id", auth, cancelOrder);
 
 module.exports = router;

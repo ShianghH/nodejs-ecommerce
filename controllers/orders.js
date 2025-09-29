@@ -1,4 +1,5 @@
 const { dataSource } = require("../db/data-source");
+const { stack } = require("../routes/orders");
 const logger = require("../utils/logger")("OrderController");
 
 const {
@@ -315,8 +316,70 @@ const getOrderDetail = async (req, res, next) => {
   }
 };
 
+const cancelOrder = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { order_id: orderId } = req.params;
+    const { reason } = req.body;
+    if (isUndefined(orderId) || isNotValidUUID(orderId)) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤:order_id",
+      });
+      return;
+    }
+    if (
+      isUndefined(reason) ||
+      isNotValidString(reason) ||
+      reason.trim().length === 0 ||
+      reason.length > 200
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤:reason",
+      });
+      return;
+    }
+    const orderRepo = dataSource.getRepository("Order");
+    const order = await orderRepo.findOne({
+      where: {
+        id: { orderId },
+      },
+      relations: {
+        user: true,
+      },
+      select: ["id", "order_status"],
+    });
+    if (!order) {
+      res.status(404).json({
+        status: "failed",
+        message: "訂單不存在",
+      });
+      return;
+    }
+    if (order.user.id !== userId) {
+      res.status(403).json({
+        status: "failed",
+        message: "無權限取消此訂單",
+      });
+      return;
+    }
+    if (order.order_status !== "pending") {
+      res.status(409).json({
+        status: "failed",
+        message: "僅能取消 pending 狀態的訂單",
+      });
+      return;
+    }
+  } catch (error) {
+    logger.warn(`[Order]: 取消訂單失敗`);
+    next(error);
+  }
+};
+
 module.exports = {
   postOrder,
   getOrder,
   getOrderDetail,
+  cancelOrder,
 };
