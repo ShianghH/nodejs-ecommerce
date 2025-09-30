@@ -64,6 +64,12 @@ module.exports = new EntitySchema({
       nullable: false,
       comment: "訂單建立時間",
     },
+    reason: {
+      type: "varchar",
+      length: 255,
+      nullable: true,
+      comment: "取消原因",
+    },
     updated_at: {
       type: "timestamp",
       updateDate: true,

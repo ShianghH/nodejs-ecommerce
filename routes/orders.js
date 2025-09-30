@@ -25,6 +25,6 @@ const {
 router.post("/", auth, postOrder);
 router.get("/", auth, getOrder);
 router.get("/:order_id", auth, getOrderDetail);
-router.post("/:order_id", auth, cancelOrder);
+router.post("/:order_id/cancel", auth, cancelOrder);
 
 module.exports = router;

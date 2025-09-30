@@ -340,39 +340,79 @@ const cancelOrder = async (req, res, next) => {
       });
       return;
     }
-    const orderRepo = dataSource.getRepository("Order");
-    const order = await orderRepo.findOne({
-      where: {
-        id: { orderId },
-      },
-      relations: {
-        user: true,
-      },
-      select: ["id", "order_status"],
-    });
-    if (!order) {
-      res.status(404).json({
-        status: "failed",
-        message: "訂單不存在",
+
+    const queryRunner = dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const orderRepo = queryRunner.manager.getRepository("Order");
+      //// 撈訂單 + 擁有者 + 明細(含變體)
+      const order = await orderRepo.findOne({
+        where: { id: orderId },
+        relations: {
+          user: true,
+          orderItems: { product_variant: true },
+        },
+      });
+      if (!order) {
+        await queryRunner.rollbackTransaction();
+        res.status(404).json({
+          status: "failed",
+          message: "訂單不存在",
+        });
+        return;
+      }
+      if (order.user.id !== userId) {
+        await queryRunner.rollbackTransaction();
+        res.status(403).json({
+          status: "failed",
+          message: "無權限取消此訂單",
+        });
+        return;
+      }
+      // 僅允許 pending
+      if (order.order_status !== "pending") {
+        await queryRunner.rollbackTransaction();
+        res.status(409).json({
+          status: "failed",
+          message: "僅能取消 pending 狀態的訂單",
+        });
+        return;
+      }
+      // ---- 回補庫存 ----
+      const variantRepo = queryRunner.manager.getRepository("ProductVariant");
+      for (const item of order.orderItems || []) {
+        const variantId = item?.product_variant?.id;
+        const qty = Number(item?.quantity);
+        if (variantId && Number.isFinite(qty) && qty > 0) {
+          await variantRepo.increment({ id: variantId }, "stock", qty);
+        }
+      }
+      // ---- 更新訂單狀態 -> cancelled ----
+      order.order_status = "cancelled";
+      if ("reason" in order) {
+        order.reason = reason;
+      }
+      await orderRepo.save(order);
+      await queryRunner.commitTransaction();
+      res.status(200).json({
+        status: "success",
+        message: "訂單已取消並回補庫存",
+        data: {
+          order_id: order.id,
+          order_status: order.order_status,
+          reason: order.reason,
+        },
       });
       return;
-    }
-    if (order.user.id !== userId) {
-      res.status(403).json({
-        status: "failed",
-        message: "無權限取消此訂單",
-      });
-      return;
-    }
-    if (order.order_status !== "pending") {
-      res.status(409).json({
-        status: "failed",
-        message: "僅能取消 pending 狀態的訂單",
-      });
-      return;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
   } catch (error) {
-    logger.warn(`[Order]: 取消訂單失敗`);
+    logger.warn(`[Order]: 取消訂單失敗${error.message}`);
     next(error);
   }
 };
