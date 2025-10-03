@@ -17,5 +17,11 @@ module.exports = new EntitySchema({
       nullable: false,
       comment: "付款方式名稱（如信用卡、ATM）",
     },
+    is_active: {
+      type: "boolean",
+      default: true,
+      nullable: false,
+      comment: "付款方式是否啟用",
+    },
   },
 });

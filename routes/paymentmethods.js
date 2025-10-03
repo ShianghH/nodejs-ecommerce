@@ -20,9 +20,11 @@ const isAdmin = require("../middlewares/isAdmin.js");
 const {
   getPaymentMethods,
   postPaymentMethods,
+  patchPaymentMethods,
 } = require("../controllers/paymentmethods.js");
 
 router.get("/", getPaymentMethods);
 router.post("/", auth, isAdmin, postPaymentMethods);
+router.patch("/:id", auth, isAdmin, patchPaymentMethods);
 
 module.exports = router;
