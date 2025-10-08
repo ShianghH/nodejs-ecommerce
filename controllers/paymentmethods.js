@@ -9,6 +9,8 @@ const {
   isNotValidUUID,
 } = require("../utils/validators");
 
+const { Not } = require("typeorm");
+
 const getPaymentMethods = async (req, res, next) => {
   try {
     const paymentRepo = dataSource.getRepository("PaymentMethod");
@@ -104,31 +106,29 @@ const patchPaymentMethods = async (req, res, next) => {
         });
         return;
       }
+      nameTrim = String(name).trim();
+      if (nameTrim.length > 50) {
+        logger.warn("[PaymentMethods] name 長度過長");
+        res.status(400).json({
+          status: "failed",
+          message: "名稱長度過長（上限 50）",
+        });
+        return;
+      }
     }
-    nameTrim = name.trim();
-    if (nameTrim.length > 50) {
-      logger.warn("[PaymentMethods] name 長度過長");
-      res.status(400).json({
-        status: "failed",
-        message: "name欄位名稱過長",
-      });
-      return;
-    }
+
     //驗證is_active
     if (!isUndefined(is_active) && typeof is_active !== "boolean") {
-      logger.warn("[PaymentMethods]is_active 欄位需為布林");
+      logger.warn("[PaymentMethods] is_active 欄位需為布林");
       res.status(400).json({
-        status: "fis_active 需為布林值",
+        status: "failed",
+        message: "is_active 需為布林值（true/false）",
       });
       return;
     }
     //取的付款方式
-    const payRepo = dataSource.getMongoRepository("PaymentMethod");
-    const pay = await payRepo.findOne({
-      where: {
-        id: idNum,
-      },
-    });
+    const payRepo = dataSource.getRepository("PaymentMethod");
+    const pay = await payRepo.findOne({ where: { id: idNum } });
     if (!pay) {
       logger.warn(`[PaymentMethods] 找不到 id=${idNum}`);
       res.status(404).json({
@@ -140,25 +140,50 @@ const patchPaymentMethods = async (req, res, next) => {
     //重複名稱檢查
     if (!isUndefined(nameTrim)) {
       const exists = await payRepo.findOne({
-        where: {
-          name: nameTrim,
-          id: Not(idNum),
-        },
+        where: { name: nameTrim, id: Not(idNum) },
       });
       if (exists) {
         logger.warn(`[PaymentMethods] 名稱重複：${nameTrim}`);
         res.status(409).json({
           status: "failed",
-          message: "付款名稱重複",
+          message: "付款方式名稱已存在",
         });
         return;
       }
     }
+
     // 更新(只更新有變更者)
-    const patch = [];
+    const patch = {};
     if (!isUndefined(nameTrim) && nameTrim !== pay.name) {
       patch.name = nameTrim;
     }
+    if (!isUndefined(is_active) && is_active !== pay.is_active) {
+      patch.is_active = is_active;
+    }
+
+    //無變更就回
+    if (Object.keys(patch).length === 0) {
+      logger.info(`[PaymentMethods] id=${idNum} 無變更`);
+      res.status(200).json({
+        status: "success",
+        message: "沒有任何變更",
+        data: { id: pay.id, name: pay.name, is_active: pay.is_active },
+      });
+      return;
+    }
+
+    //儲存
+    const updated = await payRepo.save({ ...pay, ...patch });
+    logger.info(`[PaymentMethods] 更新成功 id=${idNum}`, patch);
+    res.status(200).json({
+      status: "success",
+      message: "付款方式已更新",
+      data: {
+        id: updated.id,
+        name: updated.name,
+        is_active: updated.is_active,
+      },
+    });
   } catch (error) {
     logger.warn(`[PaymentMethods]:更改付款方式失敗${error.message}`);
     next(error);
