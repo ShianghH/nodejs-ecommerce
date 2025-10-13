@@ -8,7 +8,7 @@ const isUndefined = (value) => value === undefined;
 // 判斷傳入的值是否為無效字串：
 // 不是字串類型、空字串、或只包含空白都會被視為無效
 const isNotValidString = (value) => {
-  return typeof value !== "string" || value.trim().length === 0 || value === "";
+  return typeof value !== "string" || value.trim().length === 0;
 };
 
 // 判斷傳入的值是否為無效整數：

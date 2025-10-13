@@ -26,10 +26,12 @@ const {
   postCategory,
   patchProduct,
   deleteProduct,
+  postTag,
 } = require("../controllers/admin.js");
 
 router.post("/category", auth, isAdmin, postCategory);
 router.post("/products", auth, isAdmin, postProduct);
+router.post("/tags", auth, isAdmin, postTag);
 router.patch("/products/:product_id", auth, isAdmin, patchProduct);
 router.delete("/products/:product_id", auth, isAdmin, deleteProduct);
 

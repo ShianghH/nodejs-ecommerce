@@ -1,7 +1,6 @@
 const { dataSource } = require("../db/data-source");
 
 const logger = require("../utils/logger")("AdminController");
-
 const {
   isUndefined,
   isNotValidString,
@@ -79,7 +78,6 @@ const postProduct = async (req, res, next) => {
       is_active: isActive,
       images = [],
       variants = [],
-      tags = [],
     } = req.body;
     if (
       // 基本欄位驗證（必要欄位）
@@ -157,14 +155,18 @@ const postProduct = async (req, res, next) => {
       });
       return;
     }
-    if (!Array.isArray(tags) || tags.some((tag) => isNotValidString(tag))) {
-      res.status(400).json({
-        status: "failed",
-        message: "欄位格式錯誤",
-      });
-      return;
-    }
+
     // === 建立主商品 ===
+    const categoryRepository = dataSource.getRepository("ProductCategory");
+    const category = await categoryRepository.findOneBy({ id: categoryId });
+
+    if (!category) {
+      return res.status(400).json({
+        status: "failed",
+        message: "指定的分類不存在，請確認 category_id 是否正確",
+      });
+    }
+
     const productRepository = dataSource.getRepository("Product");
     const newProduct = productRepository.create({
       name,
@@ -174,7 +176,9 @@ const postProduct = async (req, res, next) => {
       description,
       is_active: isActive,
     });
+
     const savedProduct = await productRepository.save(newProduct);
+
     // === 建立 images / variants ===
     await Promise.all([
       ...images.map((img) =>
@@ -195,40 +199,10 @@ const postProduct = async (req, res, next) => {
       ),
     ]);
 
-    // === 處理 Tags：若不存在就建立 ===
-    const tagRepository = dataSource.getRepository("Tag");
-
-    const tagEntities = [];
-
-    for (const tagName of tags) {
-      // 先查是否存在
-      let tag = await tagRepository.findOneBy({ name: tagName });
-
-      // 若不存在，建立新 tag
-      if (!tag) {
-        tag = await tagRepository.save(tagRepository.create({ name: tagName }));
-      }
-
-      tagEntities.push(tag);
-    }
-
-    // 寫入 product_tags 中介表
-    await Promise.all(
-      tagEntities.map((tag, idx) =>
-        dataSource.getRepository("ProductTag").save({
-          product: { id: savedProduct.id },
-          tag,
-          sort_order: idx,
-        })
-      )
-    );
-
     res.status(201).json({
       status: "success",
       message: "產品新增成功",
-      data: {
-        product_id: savedProduct.id,
-      },
+      data: { product_id: savedProduct.id },
     });
   } catch (error) {
     logger.error(`[Product] 建立產品失敗: ${error.message}`);
@@ -424,9 +398,62 @@ const deleteProduct = async (req, res, next) => {
   }
 };
 
+const postTag = async (req, res, next) => {
+  try {
+    const { name } = req.body;
+    if (isUndefined(name) || isNotValidString(name)) {
+      logger.warn(`[Tag]欄位格式錯誤`);
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤",
+      });
+      return;
+    }
+    const nameTrim = name.trim();
+    if (nameTrim.length > 100) {
+      logger.warn(`[Tag]name長度過長`);
+      res.status(400).json({
+        status: "failed",
+        message: "名稱長度過長(上限100)",
+      });
+      return;
+    }
+    const tagRepo = dataSource.getRepository("Tag");
+    const existing = await tagRepo.findOne({
+      where: {
+        name: nameTrim,
+      },
+    });
+    if (existing) {
+      logger.warn(`[Tag]名稱重複:${nameTrim}`);
+      res.status(409).json({
+        status: "failed",
+        message: "標籤名稱已存在",
+      });
+      return;
+    }
+    const newTag = tagRepo.create({ name: nameTrim });
+    const saved = await tagRepo.save(newTag);
+
+    logger.info(`[Tag]新增標籤成功 ${saved.name}`);
+    res.status(200).json({
+      status: "success",
+      message: "標籤建立成功",
+      data: {
+        id: saved.id,
+        name: saved.name,
+      },
+    });
+  } catch (error) {
+    logger.warn(`[Tag]新增標籤失敗:${error.message}`);
+    next(error);
+  }
+};
+
 module.exports = {
   postCategory,
   postProduct,
   patchProduct,
   deleteProduct,
+  postTag,
 };
