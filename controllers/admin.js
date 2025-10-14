@@ -436,12 +436,13 @@ const postTag = async (req, res, next) => {
     const saved = await tagRepo.save(newTag);
 
     logger.info(`[Tag]新增標籤成功 ${saved.name}`);
-    res.status(200).json({
+    res.status(201).json({
       status: "success",
       message: "標籤建立成功",
       data: {
         id: saved.id,
         name: saved.name,
+        created_at: saved.created_at,
       },
     });
   } catch (error) {
