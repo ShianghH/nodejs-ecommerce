@@ -1,4 +1,3 @@
-const { ILike } = require("typeorm");
 const { dataSource } = require("../db/data-source");
 const logger = require("../utils/logger")("ProductsController");
 
@@ -280,7 +279,97 @@ const getProductDetail = async (req, res, next) => {
   }
 };
 
+const postProductTag = async (req, res, next) => {
+  try {
+    const { product_id: productId } = req.params;
+    const { tag_id: tagId } = req.body;
+
+    if (
+      isUndefined(productId) ||
+      isNotValidString(productId) ||
+      isNotValidUUID(productId)
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤(product_id)",
+      });
+      return;
+    }
+    if (
+      isUndefined(tagId) ||
+      isNotValidString(tagId) ||
+      isNotValidUUID(tagId)
+    ) {
+      res.status(400).json({
+        status: "failed",
+        message: "欄位格式錯誤(tag_id)",
+      });
+      return;
+    }
+    const productRepo = dataSource.getRepository("Product");
+    const tagRepo = dataSource.getRepository("Tag");
+    const productTagRepo = dataSource.getRepository("ProductTag");
+
+    // 商品是否存在
+    const product = await productRepo.findOne({
+      where: {
+        id: productId,
+      },
+    });
+    if (!product) {
+      res.status(404).json({
+        status: "failed",
+        message: "商品不存在",
+      });
+      return;
+    }
+
+    //標籤是否存在
+    const tag = await tagRepo.findOne({
+      where: {
+        id: tagId,
+      },
+    });
+    if (!tag) {
+      res.status(404).json({
+        status: "failed",
+        message: "標籤不存在",
+      });
+      return;
+    }
+
+    //檢查是否有關連
+    const isLink = await productTagRepo.exists({
+      where: {
+        product: { id: productId },
+        tag: { id: tagId },
+      },
+    });
+    if (isLink) {
+      res.status(409).json({
+        status: "failed",
+        message: "此商品已存在該標籤",
+      });
+      return;
+    }
+
+    // 取目前最大 sort_order，決定下一個排序
+    const last = await productTagRepo.find({
+      where: {
+        product: { id: productId },
+      },
+      order: { sort_order: "DESC" },
+      take: 1,
+    });
+    const nextOrder = last.length > 0 ? (last[0].sort_order ?? 0) + 1 : 0;
+  } catch (error) {
+    logger.warn(`[ProductTags]新增商品標籤失敗${error.message}`);
+    next(error);
+  }
+};
+
 module.exports = {
   getProducts,
   getProductDetail,
+  postProductTag,
 };

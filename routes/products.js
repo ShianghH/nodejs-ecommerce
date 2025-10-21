@@ -17,9 +17,16 @@ const auth = require("../middlewares/auth.js")({
   logger,
 });
 
-const { getProducts, getProductDetail } = require("../controllers/products.js");
+const isAdmin = require("../middlewares/isAdmin.js");
+
+const {
+  getProducts,
+  getProductDetail,
+  postProductTag,
+} = require("../controllers/products.js");
 
 router.get("/", getProducts);
 router.get("/:product_id", getProductDetail);
+router.post("/:product_id/tags", auth, isAdmin, postProductTag);
 
 module.exports = router;
