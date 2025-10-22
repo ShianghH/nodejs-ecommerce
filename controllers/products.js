@@ -362,6 +362,27 @@ const postProductTag = async (req, res, next) => {
       take: 1,
     });
     const nextOrder = last.length > 0 ? (last[0].sort_order ?? 0) + 1 : 0;
+
+    //建立關聯
+    const pivot = await productTagRepo.create({
+      product,
+      tag,
+      sort_order: nextOrder,
+    });
+
+    const saved = await productTagRepo.save(pivot);
+    logger.info(
+      `[ProductTag]建立成功 product_id=${productId} tag_id=${tagId} sort_order=${saved.sort_order}`
+    );
+    res.status(201).json({
+      status: "success",
+      message: "商品標籤新增成功",
+      data: {
+        product_id: productId,
+        tag_id: tagId,
+        sort_order: saved.sort_order,
+      },
+    });
   } catch (error) {
     logger.warn(`[ProductTags]新增商品標籤失敗${error.message}`);
     next(error);
