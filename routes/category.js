@@ -18,9 +18,14 @@ const auth = require("../middlewares/auth")({
   logger,
 });
 const isAdmin = require("../middlewares/isAdmin");
-const { getCategories, deleteCategories } = require("../controllers/category");
+const {
+  getCategories,
+  deleteCategories,
+  patchCategories,
+} = require("../controllers/category");
 
 router.get("/", getCategories);
 router.delete("/:category_id", auth, isAdmin, deleteCategories);
+router.patch("/:category_id", auth, isAdmin, patchCategories);
 
 module.exports = router;
