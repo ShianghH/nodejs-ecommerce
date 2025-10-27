@@ -197,7 +197,7 @@ const patchCategories = async (req, res, next) => {
       patch.name = name.trim();
     }
     if (
-      isUndefined(description) &&
+      !isUndefined(description) &&
       description.trim() !== category.description
     ) {
       patch.description = description.trim();
