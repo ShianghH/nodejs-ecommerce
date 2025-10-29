@@ -268,5 +268,48 @@ const getSalesReport = async (req, res, next) => {
     next(error);
   }
 };
+const getHotProducts = async (req, res, next) => {
+  try {
+    // 參數：days/limit 可選，category_id 可選
+    const dayRaw = String(req.query.days ?? "30");
+    const limitRaw = String(req.query.limit ?? "20");
+    const { category_id: categoryId } = req.query;
+    const days = parseInt(dayRaw, 10);
+    const limit = parseInt(limitRaw, 10);
 
-module.exports = { getSalesReport };
+    if (isNotValidInteger(days) || days > 365) {
+      logger.warn(`[HotProducts]: days須為1-365的整數${days}`);
+      res.status(400).json({
+        status: "failed",
+        message: "days須為1-365的整數",
+      });
+      return;
+    }
+
+    if (isNotValidInteger(limit) || limit > 100) {
+      logger.warn(`[HotProducts]limit須為1-100的整數${limit}`);
+      res.status(400).json({
+        status: "failed",
+        message: "limit 須為1-100的整數",
+      });
+    }
+    if (!isUndefined(categoryId)) {
+      if (isNotValidUUID(categoryId) || isNotValidString(categoryId)) {
+        logger.warn(`[HorProducts]無效 category_id: ${categoryId}`);
+        res.status(400).json({
+          status: "failed",
+          message: "欄位格式錯誤 category_id",
+        });
+        return;
+      }
+    }
+    const since = new Date();
+    //把這個日期往前推 days 天
+    since.setDate(since.getDate() - days);
+  } catch (error) {
+    logger.warn(`[Hotproduct]: 查詢失敗${error.message}`);
+    next(error);
+  }
+};
+
+module.exports = { getSalesReport, getHotProducts };

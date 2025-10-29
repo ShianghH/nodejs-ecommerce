@@ -14,7 +14,12 @@ const isNotValidString = (value) => {
 // 判斷傳入的值是否為無效整數：
 // 若非數字型別、為負數、或不是整數（小數）皆視為無效
 const isNotValidInteger = (value) => {
-  return typeof value !== "number" || value < 0 || value % 1 !== 0;
+  return (
+    typeof value !== "number" ||
+    Number.isNaN(value) ||
+    !Number.isInteger(value) ||
+    value < 0
+  );
 };
 
 const uuidRegex =
