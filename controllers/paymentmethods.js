@@ -1,6 +1,6 @@
 const { dataSource } = require("../db/data-source");
 
-const logger = require("../utils/logger")("PaymenthodsController");
+const logger = require("../utils/logger")("PaymentMethodsController");
 
 const {
   isUndefined,

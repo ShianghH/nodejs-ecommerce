@@ -15,7 +15,7 @@ const {
   isNotValidDateYMD,
 } = require("../utils/validators");
 
-const { In, Between } = require("typeorm");
+const { In, Between, MoreThanOrEqual } = require("typeorm");
 
 const getSalesReport = async (req, res, next) => {
   try {
@@ -306,6 +306,110 @@ const getHotProducts = async (req, res, next) => {
     const since = new Date();
     //把這個日期往前推 days 天
     since.setDate(since.getDate() - days);
+
+    const orderItemRepo = dataSource.getRepository("OrderItem");
+
+    // ✅ 巢狀 where 直接在 Repository 過濾關聯條件
+    const where = {
+      order: {
+        //MoreThanOrEqual>=
+        created_at: MoreThanOrEqual(since),
+        order_status: In(["PAID", "COMPLETED"]),
+      },
+      product: {
+        is_active: true,
+        ...(categoryId ? { categtory: { id: String(categoryId) } } : {}),
+      },
+    };
+    // ✅ relations 決定要載入的關聯（不影響過濾條件）
+    // ✅ select 只取需要的欄位，減少 payload
+    const items = await orderItemRepo.find({
+      where,
+      relations: {
+        product: {
+          category: true, // 前端常要顯示分類、主圖
+        },
+      },
+      select: {
+        id: true,
+        quantity: true,
+        subtotal: true,
+        order: { id: true, created_at: true, order_status: true },
+        Product: {
+          id: true,
+          name: true,
+          price: true,
+          discount_price: true,
+          is_active: true,
+          updated_at: true,
+          category: {
+            id: true,
+            name: true,
+          },
+          images: {
+            id: true,
+            image_url: true,
+            is_main: true,
+            sort_order: true,
+          },
+        },
+      },
+    });
+    //  JS 端聚合到產品層級：sold_qty / sold_amount
+    const agg = new Map(); // productId -> { product, qty, amount }
+    for (const it of items) {
+      const p = it.product;
+      if (!p) continue;
+      const key = p.id;
+      if (!agg.has(key)) {
+        agg.set(key, { product: p, aty: 0, amount: 0 });
+      }
+      const row = agg.get(key);
+      row.qty += Number(it.quantity || 0);
+      row.amount += Number(it.subtotal || 0);
+    }
+
+    // 依銷售量排序，其次銷售額，再次 updated_at（避免同分不穩定）
+    const ranked = Array.from(agg.values())
+      .sort((a, b) => {
+        if (b.qty !== a.qty) return b.qty - a.qty;
+        if (b.amount !== a.amount) return b.amount - a.amount;
+        const au = a.product.updated_at
+          ? new Date(a.product.updated_at).getTime()
+          : 0;
+        const bu = b.product.updated_at
+          ? new Date(b.product.updated_at).getTime()
+          : 0;
+      })
+      .slice(0, limit);
+
+    // 整理輸出
+    const data = ranked.map(({ product: p, qty, amount }) => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      discount_price: p.discount_price,
+      is_active: p.is_active,
+      category: p.category
+        ? { id: p.category.id, name: p.category.name }
+        : null,
+      cover_image_url:
+        Array.isArray(p.images) && p.images.length
+          ? p.images.find((i) => i.is_main || p.images[0].image_url)
+          : null,
+      sold_qty: qty,
+      sold_amount: Number(amount.toFixed(2)),
+    }));
+    logger.info(
+      `[Hotproducts] repo+relation day =${days} limit=${limit}` +
+        (categoryId ? `category = ${categoryId}` : "" + `hit=${data.length}`)
+    );
+    return res.status(200).json({
+      status: "success",
+      message: `熱門商品排行(近${days}天銷售量)`,
+      data,
+      meta: { days, limit, category_id: categoryId ?? null },
+    });
   } catch (error) {
     logger.warn(`[Hotproduct]: 查詢失敗${error.message}`);
     next(error);

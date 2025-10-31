@@ -16,7 +16,8 @@ const favoritesRouter = require("./routes/favorites");
 const cartRouter = require("./routes/cart");
 const tagsRouter = require("./routes/tags");
 const reportRouter = require("./routes/report");
-const paymentmethodsRouter = require("./routes/paymentmethods");
+const publicReportRouter = require("./routes/publicReport");
+const paymentMethodsRouter = require("./routes/paymentMethods");
 
 console.log("[Render][app] 所有 routes 載入完成");
 
@@ -77,7 +78,8 @@ app.use("/api/v1/favorites", favoritesRouter);
 app.use("/api/v1/cart", cartRouter);
 app.use("/api/v1/admin/tags", tagsRouter);
 app.use("/api/v1/admin/report", reportRouter);
-app.use("/api/v1/payment_methods", paymentmethodsRouter);
+app.use("/api/v1/report", publicReportRouter);
+app.use("/api/v1/payment_methods", paymentMethodsRouter);
 
 console.log("[Render][app] 所有 API route 註冊完成");
 

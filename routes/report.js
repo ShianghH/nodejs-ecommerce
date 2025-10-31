@@ -15,8 +15,7 @@ const auth = require("../middlewares/auth.js")({
 });
 const isAdmin = require("../middlewares/isAdmin.js");
 
-const { getSalesReport, getHotProducts } = require("../controllers/report.js");
+const { getSalesReport } = require("../controllers/report.js");
 
 router.get("/", auth, isAdmin, getSalesReport);
-router.get("/hot-products", getHotProducts);
 module.exports = router;

@@ -2,8 +2,8 @@ const express = require("express");
 const router = express.Router();
 
 const config = require("../config/index");
-const { dataSource } = require("../db/data-source");
-const logger = require("../utils/logger")("Paymentmehods");
+const { dataSource } = require("../db/data-source.js");
+const logger = require("../utils/logger.js")("PaymentMethods");
 
 //初始化「身分驗證機器人」auth，傳入它需要的工具
 const auth = require("../middlewares/auth.js")({
@@ -21,7 +21,7 @@ const {
   getPaymentMethods,
   postPaymentMethods,
   patchPaymentMethods,
-} = require("../controllers/paymentmethods.js");
+} = require("../controllers/paymentMethods.js");
 
 router.get("/", getPaymentMethods);
 router.post("/", auth, isAdmin, postPaymentMethods);
