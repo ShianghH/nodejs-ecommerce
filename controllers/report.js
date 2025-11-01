@@ -309,25 +309,29 @@ const getHotProducts = async (req, res, next) => {
 
     const orderItemRepo = dataSource.getRepository("OrderItem");
 
-    // ✅ 巢狀 where 直接在 Repository 過濾關聯條件
+    //  巢狀 where 直接在 Repository 過濾關聯條件
     const where = {
       order: {
         //MoreThanOrEqual>=
         created_at: MoreThanOrEqual(since),
-        order_status: In(["PAID", "COMPLETED"]),
+        order_status: In(["paid", "completed"]),
       },
-      product: {
-        is_active: true,
-        ...(categoryId ? { categtory: { id: String(categoryId) } } : {}),
+      product_variant: {
+        product: {
+          is_active: true,
+          ...(categoryId ? { category: { id: String(categoryId) } } : {}),
+        },
       },
     };
-    // ✅ relations 決定要載入的關聯（不影響過濾條件）
-    // ✅ select 只取需要的欄位，減少 payload
+    //  relations 決定要載入的關聯（不影響過濾條件）
+    //  select 只取需要的欄位，減少 payload
     const items = await orderItemRepo.find({
       where,
       relations: {
-        product: {
-          category: true, // 前端常要顯示分類、主圖
+        product_variant: {
+          product: {
+            category: true, // 前端常要顯示分類、主圖
+          },
         },
       },
       select: {
@@ -335,22 +339,27 @@ const getHotProducts = async (req, res, next) => {
         quantity: true,
         subtotal: true,
         order: { id: true, created_at: true, order_status: true },
-        Product: {
+        product_variant: {
           id: true,
-          name: true,
-          price: true,
-          discount_price: true,
-          is_active: true,
-          updated_at: true,
-          category: {
+          option_name: true,
+          value: true,
+          product: {
             id: true,
             name: true,
-          },
-          images: {
-            id: true,
-            image_url: true,
-            is_main: true,
-            sort_order: true,
+            price: true,
+            discount_price: true,
+            is_active: true,
+            updated_at: true,
+            category: {
+              id: true,
+              name: true,
+            },
+            images: {
+              id: true,
+              image_url: true,
+              is_main: true,
+              sort_order: true,
+            },
           },
         },
       },
@@ -401,7 +410,7 @@ const getHotProducts = async (req, res, next) => {
       sold_amount: Number(amount.toFixed(2)),
     }));
     logger.info(
-      `[Hotproducts] repo+relation day =${days} limit=${limit}` +
+      `[HotProducts] repo+relation day =${days} limit=${limit}` +
         (categoryId ? `category = ${categoryId}` : "" + `hit=${data.length}`)
     );
     return res.status(200).json({
@@ -411,7 +420,7 @@ const getHotProducts = async (req, res, next) => {
       meta: { days, limit, category_id: categoryId ?? null },
     });
   } catch (error) {
-    logger.warn(`[Hotproduct]: 查詢失敗${error.message}`);
+    logger.warn(`[HotProduct]: 查詢失敗${error.message}`);
     next(error);
   }
 };
