@@ -16,7 +16,8 @@
     "test:unit": "node --experimental-vm-modules node_modules/.bin/jest --config ./jest.config.js --coverage --roots ./test/unit",
     "test:integration": "node --experimental-vm-modules node_modules/.bin/jest --testSequencer=./test/sequencer -i --config ./jest.config.js --coverage --roots ./test/integration",
     "init:schema": "typeorm schema:sync -d ./db/data-source.js",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "db:seed:reset": "node scripts/seed-reset.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
