@@ -83,5 +83,31 @@ const seed = async () => {
         category: defaultCategory,
       })
     );
+    console.log("[seed]建立產品", demoName);
+  } else {
+    console.log("[seed]商品已存在,跳過建立", demoName);
   }
+
+  //主圖
+  const hasImage = await imageRepo.count({
+    where: {
+      product: { id: product.id },
+    },
+  });
+  if (!hasImage) {
+    await imageRepo.save(
+      imageRepo.create({
+        product,
+        image_url: "https://via.placeholder.com/400x300?text=Keyboard",
+        is_main: true,
+      })
+    );
+    console.log("[seed]建立圖片");
+  } else {
+    console.log("[seed]商品已有圖片,跳過");
+  }
+
+  //tag
+  const tagName = ["RGB", "Wired"];
+  const tag = [];
 };
