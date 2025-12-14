@@ -108,6 +108,42 @@ const seed = async () => {
   }
 
   //tag
-  const tagName = ["RGB", "Wired"];
-  const tag = [];
+  const tagNames = ["RGB", "Wired"];
+  const tags = [];
+  for (const name of tagNames) {
+    let tag = await tagRepo.findOne({
+      where: { name },
+    });
+    if (!tag) {
+      tag = await tagRepo.save(
+        tagRepo.create({
+          name,
+        })
+      );
+      console.log("[seed]建立標籤", name);
+    }
+    tags.push(tag);
+  }
+
+  //ProductTag
+  for (const tag of tags) {
+    const exist = await productRepo.findOne({
+      where: {
+        product: { id: product.id },
+        tag: { id: tag.id },
+      },
+    });
+    if (!exist) {
+      await productRepo.save(
+        productRepo.create({
+          product,
+          tag,
+        })
+      );
+      console.log("[seed]建立商品與Tag關聯", product.name, "_", tag.name);
+    }
+  }
+
+  //variants
+  const variantCount = await variantRepo.count({});
 };
