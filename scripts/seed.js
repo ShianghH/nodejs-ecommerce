@@ -127,15 +127,15 @@ const seed = async () => {
 
   //ProductTag
   for (const tag of tags) {
-    const exist = await productRepo.findOne({
+    const exist = await productTagRepo.findOne({
       where: {
         product: { id: product.id },
         tag: { id: tag.id },
       },
     });
     if (!exist) {
-      await productRepo.save(
-        productRepo.create({
+      await productTagRepo.save(
+        productTagRepo.create({
           product,
           tag,
         })
@@ -145,5 +145,28 @@ const seed = async () => {
   }
 
   //variants
-  const variantCount = await variantRepo.count({});
+  const variantCount = await variantRepo.count({
+    where: {
+      product: { id: product.id },
+    },
+  });
+  if (!variantCount) {
+    await variantRepo.save([
+      variantRepo.create({
+        product,
+        option_name: "Switch",
+        value: "Red",
+        stock: 20,
+      }),
+      variantRepo.create({
+        product,
+        option_name: "Switch",
+        value: "Black",
+        stock: "15",
+      }),
+    ]);
+    console.log("[seed]建立商品variant兩種(Res/Black)");
+  } else {
+    console.log("[seed]商品已有variant,跳過建立");
+  }
 };
