@@ -4,13 +4,12 @@ const { dataSource } = require("../db/data-source");
 
 const User = require("../entities/User");
 const UserRole = require("../entities/UserRole");
-const Products = require("../entities/Product");
+const Product = require("../entities/Product");
 const ProductCategory = require("../entities/ProductCategory");
 const ProductVariant = require("../entities/ProductVariant");
 const ProductImage = require("../entities/ProductImage");
 const ProductTag = require("../entities/ProductTag");
 const Tag = require("../entities/Tag");
-const OrderItem = require("../entities/OrderItem");
 
 const bcrypt = require("bcrypt");
 
@@ -20,35 +19,57 @@ const seed = async () => {
 
   const userRepo = dataSource.getRepository(User);
   const userRoleRepo = dataSource.getRepository(UserRole);
-  const productRepo = dataSource.getRepository(Products);
+  const productRepo = dataSource.getRepository(Product);
   const categoryRepo = dataSource.getRepository(ProductCategory);
   const variantRepo = dataSource.getRepository(ProductVariant);
   const imageRepo = dataSource.getRepository(ProductImage);
   const productTagRepo = dataSource.getRepository(ProductTag);
   const tagRepo = dataSource.getRepository(Tag);
-  const orderRepo = dataSource.getRepository(OrderItem);
 
-  //1.管理員帳號
+  //1.先建立user帳號 > admin
   const adminEmail = "adminVip@example.com";
-  let admin = await userRepo.findOne({
+  let adminUser = await userRepo.findOne({
     where: { email: adminEmail },
   });
-  if (!admin) {
-    const passwordHash = await bcrypt.hash("admin", 10);
+  if (!adminUser) {
+    const passwordHash = await bcrypt.hash("admin123", 10);
 
-    admin = await userRepo.save(
+    adminUser = await userRepo.save(
       userRepo.create({
         name: "Admin",
         email: adminEmail,
         password: passwordHash,
+        is_active: true,
       })
     );
-    console.log("[seed]管理員建立成功", adminEmail);
+    console.log("[seed]使用者建立成功", adminEmail);
   } else {
-    console.log("[seed]管理員已存在，跳過", adminEmail);
+    console.log("[seed]使用者已存在，跳過", adminEmail);
   }
 
-  //2.分類
+  //2.userRole
+  const adminRoleName = "admin";
+
+  const existUserRole = await userRoleRepo.findOne({
+    where: {
+      user: { id: adminUser.id },
+      roleName: adminRoleName,
+    },
+    relations: ["user"],
+  });
+  if (!existUserRole) {
+    await userRoleRepo.save(
+      userRoleRepo.create({
+        user: adminUser,
+        roleName: adminRoleName,
+      })
+    );
+    console.log("[seed] admin 使用者已綁定 admin role");
+  } else {
+    console.log("[seed] admin 使用者已有 admin role，跳過");
+  }
+
+  //3.分類
   let defaultCategory = await categoryRepo.findOne({
     where: { name: "Default" },
   });
@@ -132,6 +153,7 @@ const seed = async () => {
         product: { id: product.id },
         tag: { id: tag.id },
       },
+      relations: ["product", "tag"],
     });
     if (!exist) {
       await productTagRepo.save(
@@ -162,11 +184,18 @@ const seed = async () => {
         product,
         option_name: "Switch",
         value: "Black",
-        stock: "15",
+        stock: 15,
       }),
     ]);
-    console.log("[seed]建立商品variant兩種(Res/Black)");
+    console.log("[seed]建立商品variant兩種(Red/Black)");
   } else {
     console.log("[seed]商品已有variant,跳過建立");
   }
+  await dataSource.destroy();
+  console.log("\n[seed]完成(資料庫沒有被清空，只是補齊缺少的基本資料)\n");
 };
+
+seed().catch((e) => {
+  console.error("[seed]失敗", e);
+  process.exit(1);
+});

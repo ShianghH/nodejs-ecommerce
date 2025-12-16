@@ -11,7 +11,7 @@ module.exports = new EntitySchema({
       nullable: false,
       comment: "使用者角色唯一 ID",
     },
-    rolename: {
+    roleName: {
       type: "varchar",
       length: 50,
       nullable: false,
