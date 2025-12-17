@@ -1,3 +1,6 @@
+// 本 seed 僅在資料完全不存在時建立預設 variant
+// 若商品已有任一 variant，視為已人工管理，將不再介入
+
 require("dotenv/config");
 
 const { dataSource } = require("../db/data-source");
